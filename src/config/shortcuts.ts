@@ -1,4 +1,4 @@
-export type ShortcutGroup = 'Navigation' | 'General' | 'Devices' | 'MQTT console'
+export type ShortcutGroup = 'Navigation' | 'General' | 'Devices' | 'Users' | 'MQTT console'
 
 export interface ShortcutDefinition {
   combo: string
@@ -8,6 +8,8 @@ export interface ShortcutDefinition {
 
 export const SHORTCUTS = {
   'nav.dashboard': { combo: 'g d', label: 'Go to dashboard', group: 'Navigation' },
+  'nav.users': { combo: 'g u', label: 'Go to users', group: 'Navigation' },
+  'nav.notifications': { combo: 'g n', label: 'Go to notifications', group: 'Navigation' },
   'nav.devices': { combo: 'g v', label: 'Go to devices', group: 'Navigation' },
   'nav.console': { combo: 'g m', label: 'Go to MQTT console', group: 'Navigation' },
   'app.help': { combo: 'shift+?', label: 'Show keyboard shortcuts', group: 'General' },
@@ -16,6 +18,7 @@ export const SHORTCUTS = {
   'app.theme': { combo: 'alt+t', label: 'Switch light or dark theme', group: 'General' },
   'app.sidebar': { combo: 'mod+b', label: 'Collapse or expand sidebar', group: 'General' },
   'modal.submit': { combo: 'mod+s', label: 'Save the open form', group: 'General' },
+  'users.create': { combo: 'alt+n', label: 'Add a user', group: 'Users' },
   'devices.create': { combo: 'alt+n', label: 'Register a device', group: 'Devices' },
   'console.connect': { combo: 'alt+c', label: 'Connect or disconnect', group: 'MQTT console' },
   'console.publish': { combo: 'mod+enter', label: 'Publish message', group: 'MQTT console' },
@@ -25,4 +28,10 @@ export const SHORTCUTS = {
 
 export type ShortcutId = keyof typeof SHORTCUTS
 
-export const SHORTCUT_GROUPS: ShortcutGroup[] = ['General', 'Navigation', 'Devices', 'MQTT console']
+export const SHORTCUT_GROUPS: ShortcutGroup[] = [
+  'General',
+  'Navigation',
+  'Users',
+  'Devices',
+  'MQTT console',
+]

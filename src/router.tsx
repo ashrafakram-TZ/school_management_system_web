@@ -5,10 +5,15 @@ import {
   createRouter,
   lazyRouteComponent,
   Outlet,
+  redirect,
 } from '@tanstack/react-router'
+import { z } from 'zod'
 import { AppLayout } from '@/components/layout/app-layout'
 import { queryClient } from '@/lib/api/query-client'
+import { session } from '@/lib/auth/session'
 import { GeneralErrorPage, NotFoundPage } from '@/features/errors/error-pages'
+import { outboxSearchSchema } from '@/features/notifications/search'
+import { usersSearchSchema } from '@/features/users/search'
 
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: Outlet,
@@ -16,9 +21,24 @@ const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   errorComponent: GeneralErrorPage,
 })
 
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/login',
+  validateSearch: z.object({ redirect: z.string().optional().catch(undefined) }),
+  beforeLoad: () => {
+    if (session.get()) throw redirect({ to: '/' })
+  },
+  component: lazyRouteComponent(() => import('@/features/auth/pages/login-page'), 'LoginPage'),
+})
+
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
-  id: 'app',
+  id: '_app',
+  beforeLoad: ({ location }) => {
+    if (!session.get()) {
+      throw redirect({ to: '/login', search: { redirect: location.href }, replace: true })
+    }
+  },
   component: AppLayout,
 })
 
@@ -28,6 +48,23 @@ const dashboardRoute = createRoute({
   component: lazyRouteComponent(
     () => import('@/features/dashboard/pages/dashboard-page'),
     'DashboardPage'
+  ),
+})
+
+const usersRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/users',
+  validateSearch: usersSearchSchema,
+  component: lazyRouteComponent(() => import('@/features/users/pages/users-page'), 'UsersPage'),
+})
+
+const notificationsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/notifications',
+  validateSearch: outboxSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/notifications/pages/notifications-page'),
+    'NotificationsPage'
   ),
 })
 
@@ -59,7 +96,15 @@ const consoleRoute = createRoute({
 })
 
 const routeTree = rootRoute.addChildren([
-  appRoute.addChildren([dashboardRoute, devicesRoute, deviceDetailRoute, consoleRoute]),
+  loginRoute,
+  appRoute.addChildren([
+    dashboardRoute,
+    usersRoute,
+    notificationsRoute,
+    devicesRoute,
+    deviceDetailRoute,
+    consoleRoute,
+  ]),
 ])
 
 export const router = createRouter({

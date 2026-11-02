@@ -3,17 +3,24 @@ import { X } from 'lucide-react'
 import { BrandLogo, BrandMark } from '@/components/common/brand-logo'
 import { Kbd } from '@/components/shortcuts/kbd'
 import { Button } from '@/components/ui/button'
-import { NAV_ITEMS } from '@/config/nav'
+import { NAV_GROUPS } from '@/config/nav'
+import { can, type Me } from '@/features/auth/api'
 import { cn } from '@/lib/utils'
 import { SystemStatus } from './system-status'
 
 interface AppSidebarProps {
+  me: Me
   collapsed: boolean
   mobileOpen: boolean
   onMobileClose: () => void
 }
 
-export function AppSidebar({ collapsed, mobileOpen, onMobileClose }: AppSidebarProps) {
+export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSidebarProps) {
+  const groups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => can(me, item.permission)),
+  })).filter((group) => group.items.length > 0)
+
   return (
     <>
       {mobileOpen && (
@@ -53,52 +60,74 @@ export function AppSidebar({ collapsed, mobileOpen, onMobileClose }: AppSidebarP
           </Button>
         </div>
 
-        <nav className='flex-1 overflow-y-auto px-3 py-4'>
-          <div
-            className={cn(
-              'px-3 pb-2 text-[10px] font-bold tracking-[0.14em] text-sidebar-muted uppercase',
-              collapsed && 'md:sr-only'
-            )}
-          >
-            Fleet
+        {me.school && (
+          <div className={cn('px-5 pt-4', collapsed && 'md:hidden')}>
+            <div className='rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2.5'>
+              <div className='truncate text-xs font-bold text-sidebar-accent-foreground'>
+                {me.school.name}
+              </div>
+              <div className='text-[11px] text-sidebar-muted'>School code {me.school.code}</div>
+            </div>
           </div>
-          <ul className='grid gap-1'>
-            {NAV_ITEMS.map((item) => (
-              <li key={item.to}>
-                <Link
-                  to={item.to}
-                  onClick={onMobileClose}
-                  activeOptions={{ exact: item.to === '/' }}
-                  title={collapsed ? item.label : undefined}
+        )}
+
+        <nav className='flex-1 overflow-y-auto px-3 py-4'>
+          <div className='grid gap-5'>
+            {groups.map((group) => (
+              <div key={group.label} className='grid gap-1'>
+                <div
                   className={cn(
-                    'group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-primary',
-                    'data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground',
-                    collapsed && 'md:justify-center md:px-0'
+                    'px-3 pb-1 text-[10px] font-bold tracking-[0.14em] text-sidebar-muted uppercase',
+                    collapsed && 'md:sr-only'
                   )}
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className='absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-sidebar-primary' />
-                      )}
-                      <item.icon
-                        className={cn('size-[18px] shrink-0', isActive && 'text-sidebar-primary')}
-                      />
-                      <span className={cn('truncate', collapsed && 'md:hidden')}>{item.label}</span>
-                      <Kbd
-                        id={item.shortcut}
-                        inverted
+                  {group.label}
+                </div>
+                <ul className='grid gap-1'>
+                  {group.items.map((item) => (
+                    <li key={item.to}>
+                      <Link
+                        to={item.to}
+                        onClick={onMobileClose}
+                        activeOptions={{ exact: item.to === '/' }}
+                        title={collapsed ? item.label : undefined}
                         className={cn(
-                          'ml-auto opacity-0 transition-opacity group-hover:opacity-100',
-                          collapsed && 'md:hidden'
+                          'group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-primary',
+                          'data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground',
+                          collapsed && 'md:justify-center md:px-0'
                         )}
-                      />
-                    </>
-                  )}
-                </Link>
-              </li>
+                      >
+                        {({ isActive }) => (
+                          <>
+                            {isActive && (
+                              <span className='absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-sidebar-primary' />
+                            )}
+                            <item.icon
+                              className={cn(
+                                'size-[18px] shrink-0',
+                                isActive && 'text-sidebar-primary'
+                              )}
+                            />
+                            <span className={cn('truncate', collapsed && 'md:hidden')}>
+                              {item.label}
+                            </span>
+                            <Kbd
+                              id={item.shortcut}
+                              inverted
+                              className={cn(
+                                'ml-auto opacity-0 transition-opacity group-hover:opacity-100',
+                                collapsed && 'md:hidden'
+                              )}
+                            />
+                          </>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         </nav>
 
         <div className='shrink-0 p-3'>

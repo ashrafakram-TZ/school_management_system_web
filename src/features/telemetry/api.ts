@@ -33,7 +33,7 @@ export const telemetryKeys = {
 
 const fetchLatest = async (deviceId: number) => {
   try {
-    return await api.get<Telemetry>(`/devices/${deviceId}/telemetry/latest`)
+    return await api.get<Telemetry>(`/fleet/devices/${deviceId}/telemetry/latest`)
   } catch (error) {
     if (error instanceof ApiError && error.isNotFound) return null
     throw error
@@ -43,7 +43,7 @@ const fetchLatest = async (deviceId: number) => {
 export const telemetryApi = {
   latest: fetchLatest,
   history: (deviceId: number, params: TelemetryHistoryParams) =>
-    api.get<Paginated<Telemetry>>(`/devices/${deviceId}/telemetry`, { ...params }),
+    api.get<Paginated<Telemetry>>(`/fleet/devices/${deviceId}/telemetry`, { ...params }),
 }
 
 export function useLatestTelemetry(deviceId: number) {

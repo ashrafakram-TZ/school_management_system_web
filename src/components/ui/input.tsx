@@ -20,10 +20,6 @@ export function Textarea({ className, ...props }: React.ComponentProps<'textarea
   )
 }
 
-export function NativeSelect({ className, ...props }: React.ComponentProps<'select'>) {
-  return <select data-slot='select' className={cn(fieldBase, 'h-9 pr-8', className)} {...props} />
-}
-
 export function Label({ className, ...props }: React.ComponentProps<'label'>) {
   return (
     <label

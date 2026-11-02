@@ -1,0 +1,350 @@
+import { Controller, useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Check } from 'lucide-react'
+import { z } from 'zod'
+import { AppModal } from '@/components/common/app-modal'
+import { Combobox } from '@/components/common/combobox'
+import { FormField } from '@/components/common/form-field'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+import type { AppSection } from '@/features/auth/api'
+import { alerts } from '@/lib/alerts'
+import { toApiError } from '@/lib/api/errors'
+import { cn } from '@/lib/utils'
+import { useRoles, useSaveUser, type Role, type UserListItem } from '../api'
+import { APP_LABELS } from '../labels'
+
+const FORM_ID = 'user-form'
+const LANGUAGE_OPTIONS = [
+  { value: 'en', label: 'English' },
+  { value: 'ta', label: 'தமிழ் (Tamil)' },
+]
+const APP_ORDER: AppSection[] = ['admin', 'staff', 'parent', 'driver']
+
+const schema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, 'Enter the full name')
+    .max(120, 'Name must be 120 characters or less'),
+  mobile: z
+    .string()
+    .trim()
+    .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
+  email: z
+    .string()
+    .trim()
+    .max(150, 'Email must be 150 characters or less')
+    .refine((value) => !value || z.email().safeParse(value).success, 'Enter a valid email address'),
+  role_codes: z.array(z.string()).min(1, 'Choose at least one role'),
+  language: z.enum(['en', 'ta']),
+  active: z.boolean(),
+})
+
+type FormValues = z.infer<typeof schema>
+
+interface UserFormModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  user?: UserListItem | null
+  canAssignSuperAdmin: boolean
+}
+
+export function UserFormModal({
+  open,
+  onOpenChange,
+  user,
+  canAssignSuperAdmin,
+}: UserFormModalProps) {
+  const save = useSaveUser()
+  const editing = Boolean(user)
+
+  return (
+    <AppModal
+      open={open}
+      onOpenChange={onOpenChange}
+      title={editing ? 'Edit user' : 'Add user'}
+      description={
+        editing
+          ? 'Role and status changes apply the next time the app checks in.'
+          : 'The user signs in with this mobile number and a one-time code.'
+      }
+      formId={FORM_ID}
+      submitText={editing ? 'Save changes' : 'Add user'}
+      loading={save.isPending}
+      size='lg'
+    >
+      <UserForm
+        key={user?.id ?? 'new'}
+        user={user ?? null}
+        canAssignSuperAdmin={canAssignSuperAdmin}
+        onSubmit={async (values) => {
+          await save.mutateAsync({
+            id: user?.id,
+            input: {
+              name: values.name,
+              mobile: values.mobile,
+              email: values.email || null,
+              role_codes: values.role_codes,
+              language: values.language,
+              status: values.active ? 'active' : 'inactive',
+            },
+          })
+          alerts.success(editing ? 'User updated' : 'User added', {
+            description: editing
+              ? undefined
+              : `${values.name} can now sign in with +91 ${values.mobile}`,
+          })
+          onOpenChange(false)
+        }}
+      />
+    </AppModal>
+  )
+}
+
+interface UserFormProps {
+  user: UserListItem | null
+  canAssignSuperAdmin: boolean
+  onSubmit: (values: FormValues) => Promise<void>
+}
+
+function UserForm({ user, canAssignSuperAdmin, onSubmit }: UserFormProps) {
+  const roles = useRoles()
+  const {
+    register,
+    control,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      name: user?.name ?? '',
+      mobile: user?.mobile ?? '',
+      email: user?.email ?? '',
+      role_codes: user?.roles.map((role) => role.code) ?? [],
+      language: user?.language ?? 'en',
+      active: (user?.status ?? 'active') === 'active',
+    },
+  })
+
+  const submit = handleSubmit(async (values) => {
+    try {
+      await onSubmit(values)
+    } catch (error) {
+      const apiError = toApiError(error)
+      const fields: (keyof FormValues)[] = ['name', 'mobile', 'email', 'role_codes', 'language']
+      let mapped = false
+      apiError.fieldErrors.forEach((fieldError) => {
+        const field = fields.find((name) => name === fieldError.field)
+        if (field) {
+          setError(field, { message: fieldError.message }, { shouldFocus: !mapped })
+          mapped = true
+        }
+      })
+      if (apiError.code === 'MOBILE_TAKEN') {
+        setError('mobile', { message: apiError.message }, { shouldFocus: true })
+      } else if (!mapped) {
+        setError('root', { message: apiError.message })
+      }
+    }
+  })
+
+  const grouped = APP_ORDER.map((app) => ({
+    app,
+    roles: (roles.data ?? []).filter(
+      (role) => role.app === app && (role.code !== 'SUPER_ADMIN' || canAssignSuperAdmin)
+    ),
+  })).filter((group) => group.roles.length)
+
+  return (
+    <form id={FORM_ID} onSubmit={submit} noValidate className='grid gap-5'>
+      {errors.root?.message && (
+        <p
+          role='alert'
+          className='rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive'
+        >
+          {errors.root.message}
+        </p>
+      )}
+      <div className='grid gap-4 sm:grid-cols-2'>
+        <FormField id='name' label='Full name' required error={errors.name?.message}>
+          <Input
+            id='name'
+            autoFocus
+            autoComplete='off'
+            placeholder='Priya Sundaram'
+            aria-invalid={Boolean(errors.name)}
+            {...register('name')}
+          />
+        </FormField>
+        <FormField
+          id='mobile'
+          label='Mobile number'
+          required
+          error={errors.mobile?.message}
+          hint='Used to sign in'
+        >
+          <div className='flex'>
+            <span className='inline-flex h-9 items-center rounded-l-md border border-r-0 border-input bg-muted px-2.5 text-sm font-semibold text-muted-foreground'>
+              +91
+            </span>
+            <Input
+              id='mobile'
+              type='tel'
+              inputMode='numeric'
+              maxLength={10}
+              placeholder='9876543210'
+              className='tabular rounded-l-none'
+              aria-invalid={Boolean(errors.mobile)}
+              {...register('mobile', {
+                setValueAs: (value: string) => value.replace(/\D/g, '').slice(-10),
+              })}
+            />
+          </div>
+        </FormField>
+        <FormField id='email' label='Email' error={errors.email?.message}>
+          <Input
+            id='email'
+            type='email'
+            autoComplete='off'
+            placeholder='priya@school.in'
+            aria-invalid={Boolean(errors.email)}
+            {...register('email')}
+          />
+        </FormField>
+        <FormField
+          id='language'
+          label='Language'
+          hint='App text and notifications'
+          error={errors.language?.message}
+        >
+          <Controller
+            control={control}
+            name='language'
+            render={({ field }) => (
+              <Combobox
+                id='language'
+                label='Language'
+                value={field.value}
+                placeholder='Choose a language'
+                searchPlaceholder='Search language'
+                options={LANGUAGE_OPTIONS}
+                onChange={(value) => field.onChange(value ?? 'en')}
+                highlightSelected={false}
+                className='sm:w-full'
+              />
+            )}
+          />
+        </FormField>
+      </div>
+
+      <Controller
+        control={control}
+        name='role_codes'
+        render={({ field }) => (
+          <fieldset className='grid gap-3'>
+            <legend className='mb-1 text-xs font-semibold'>
+              Roles<span className='ml-0.5 text-destructive'>*</span>
+            </legend>
+            {roles.isPending ? (
+              <div className='grid gap-2 sm:grid-cols-2'>
+                {Array.from({ length: 4 }, (_, index) => (
+                  <Skeleton key={index} className='h-14' />
+                ))}
+              </div>
+            ) : (
+              grouped.map((group) => (
+                <div key={group.app} className='grid gap-2'>
+                  <span className='text-[11px] font-bold tracking-wider text-muted-foreground uppercase'>
+                    {APP_LABELS[group.app]}
+                  </span>
+                  <div className='grid gap-2 sm:grid-cols-2'>
+                    {group.roles.map((role) => (
+                      <RoleOption
+                        key={role.code}
+                        role={role}
+                        checked={field.value.includes(role.code)}
+                        onToggle={(checked) =>
+                          field.onChange(
+                            checked
+                              ? [...field.value, role.code]
+                              : field.value.filter((code) => code !== role.code)
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+            {errors.role_codes?.message && (
+              <p role='alert' className='text-xs font-medium text-destructive'>
+                {errors.role_codes.message}
+              </p>
+            )}
+          </fieldset>
+        )}
+      />
+
+      <Controller
+        control={control}
+        name='active'
+        render={({ field }) => (
+          <div className='flex items-center justify-between gap-4 rounded-lg border bg-muted/40 px-4 py-3'>
+            <div className='grid gap-0.5'>
+              <label htmlFor='active' className='text-sm font-semibold'>
+                Account active
+              </label>
+              <p className='text-xs text-muted-foreground'>
+                Switching this off signs the user out on every device.
+              </p>
+            </div>
+            <Switch id='active' checked={field.value} onCheckedChange={field.onChange} />
+          </div>
+        )}
+      />
+    </form>
+  )
+}
+
+function RoleOption({
+  role,
+  checked,
+  onToggle,
+}: {
+  role: Role
+  checked: boolean
+  onToggle: (checked: boolean) => void
+}) {
+  return (
+    <label
+      className={cn(
+        'flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/30',
+        checked ? 'border-primary/60 bg-primary/5' : 'hover:bg-muted/60'
+      )}
+    >
+      <input
+        type='checkbox'
+        className='sr-only'
+        checked={checked}
+        onChange={(event) => onToggle(event.target.checked)}
+      />
+      <span
+        className={cn(
+          'mt-0.5 grid size-4 shrink-0 place-items-center rounded border',
+          checked ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-card'
+        )}
+      >
+        {checked && <Check className='size-3' strokeWidth={3} />}
+      </span>
+      <span className='grid gap-0.5'>
+        <span className='text-sm font-semibold'>{role.name}</span>
+        {role.description && (
+          <span className='text-xs leading-snug text-muted-foreground'>{role.description}</span>
+        )}
+      </span>
+    </label>
+  )
+}

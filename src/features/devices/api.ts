@@ -34,11 +34,12 @@ export const deviceKeys = {
 }
 
 export const devicesApi = {
-  list: (params: DeviceListParams) => api.get<Paginated<Device>>('/devices', { ...params }),
-  get: (id: number) => api.get<Device>(`/devices/${id}`),
-  create: (input: DeviceInput) => api.post<Device>('/devices', input),
-  update: (id: number, input: Partial<DeviceInput>) => api.patch<Device>(`/devices/${id}`, input),
-  remove: (id: number) => api.delete<{ id: number }>(`/devices/${id}`),
+  list: (params: DeviceListParams) => api.get<Paginated<Device>>('/fleet/devices', { ...params }),
+  get: (id: number) => api.get<Device>(`/fleet/devices/${id}`),
+  create: (input: DeviceInput) => api.post<Device>('/fleet/devices', input),
+  update: (id: number, input: Partial<DeviceInput>) =>
+    api.patch<Device>(`/fleet/devices/${id}`, input),
+  remove: (id: number) => api.delete<{ id: number }>(`/fleet/devices/${id}`),
 }
 
 export function useDevices(params: DeviceListParams, { live = false } = {}) {

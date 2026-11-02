@@ -9,8 +9,8 @@ const number = (value: unknown, fallback: number) => {
 }
 
 export const config = {
-  appName: text(env.VITE_APP_NAME, 'Tamilzorous Telematics'),
-  apiUrl: text(env.VITE_API_URL, '/api').replace(/\/$/, ''),
+  appName: text(env.VITE_APP_NAME, 'Tamilzorous School'),
+  apiUrl: text(env.VITE_API_URL, '/api/v1').replace(/\/$/, ''),
   mqttUrl: text(env.VITE_MQTT_URL, 'mqtt://broker.hivemq.com:1883'),
   mqttTopicFilter: text(env.VITE_MQTT_TOPIC_FILTER, 'telematics/+/telemetry'),
   timeZone: text(env.VITE_TIMEZONE, 'Asia/Kolkata'),
