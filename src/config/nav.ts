@@ -3,12 +3,13 @@ import {
   Building2,
   ClipboardList,
   GraduationCap,
+  Grid3x3,
   HeartHandshake,
   LayoutDashboard,
-  RadioTower,
   School,
   ShieldCheck,
   Truck,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import type { ShortcutId } from './shortcuts'
@@ -18,9 +19,10 @@ export type NavPath =
   | '/students'
   | '/admissions'
   | '/guardians'
+  | '/staff'
+  | '/staff/assignments'
   | '/notifications'
-  | '/devices'
-  | '/console'
+  | '/fleet'
   | '/setup'
   | '/schools'
   | '/users'
@@ -79,6 +81,22 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: 'nav.guardians',
         permission: 'students.view',
       },
+      {
+        to: '/staff',
+        label: 'Staff',
+        description: 'Teachers and staff with load, documents and bank details',
+        icon: UsersRound,
+        shortcut: 'nav.staff',
+        permission: 'staff.view',
+      },
+      {
+        to: '/staff/assignments',
+        label: 'Teacher assignments',
+        description: 'Who teaches each subject in each section',
+        icon: Grid3x3,
+        shortcut: 'nav.assignments',
+        permission: 'staff.view',
+      },
     ],
   },
   {
@@ -98,20 +116,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Fleet',
     items: [
       {
-        to: '/devices',
-        label: 'Devices',
-        description: 'Registered trackers',
+        to: '/fleet',
+        label: 'Bus tracking',
+        description: 'Where every bus is and whether it is moving',
         icon: Truck,
-        shortcut: 'nav.devices',
+        shortcut: 'nav.fleet',
         permission: 'fleet.view',
-      },
-      {
-        to: '/console',
-        label: 'MQTT console',
-        description: 'Publish and watch messages',
-        icon: RadioTower,
-        shortcut: 'nav.console',
-        permission: 'fleet.manage',
       },
     ],
   },

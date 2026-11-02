@@ -55,7 +55,7 @@ export function toApiError(error: unknown): ApiError {
     if (error.code === 'ECONNABORTED') {
       return new ApiError(0, 'TIMEOUT', 'The server took too long to respond. Try again.')
     }
-    if (!error.response) {
+    if (!error.response || [502, 503, 504].includes(error.response.status)) {
       return new ApiError(
         0,
         'NETWORK_ERROR',

@@ -209,7 +209,7 @@ function SchoolModal({ onClose }: { onClose: () => void }) {
           if (!/^[A-Za-z0-9]{2,20}$/.test(draft.code.trim()))
             next.code = '2 to 20 letters or digits'
           if (draft.admin_name && !/^[6-9]\d{9}$/.test(draft.admin_mobile))
-            next.admin_mobile = 'Enter a valid 10-digit mobile'
+            next.admin_mobile = 'Enter a valid 10-digit mobile number'
           if (draft.admin_mobile && draft.admin_name.trim().length < 2)
             next.admin_name = 'Enter the admin name'
           setErrors(next)

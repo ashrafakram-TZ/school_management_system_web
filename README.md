@@ -1,8 +1,8 @@
-# Telematics Web
+# School Admin Web
 
-Tamilzorous Telematics frontend. It shows a fleet dashboard, device management with history, and an MQTT console for testing devices. It talks to the Telematics API in `C:\Users\DELL\Telematics`.
+Admin web for the Tamilzorous School Management System. It talks to the School API (`C:/Users/DELL/Telematics`). Bus positions come from the separate Telematics service through the School API; this app never calls the Telematics service or an MQTT broker directly.
 
-Stack: Vite, React 19, TypeScript (strict), Tailwind CSS 4, TanStack Router and Query, axios, react-hook-form with zod, Leaflet, mqtt.js.
+Stack: Vite, React 19, TypeScript (strict), Tailwind CSS 4, TanStack Router and Query, axios, react-hook-form with zod, Leaflet.
 
 ## Run
 
@@ -12,50 +12,38 @@ cp .env.example .env
 npm run start:local:win
 ```
 
-- Start the backend first (`npm run start:local:win` in the Telematics folder).
-- The terminal prints a `Local` and a `Network` URL. Share the Network URL, for example `http://192.168.1.7:5173`, with anyone on the same network.
+- Start the School API first (port 3000). Bus tracking also needs the Telematics service (port 3001); every other page works without it.
+- The terminal prints a `Local` and a `Network` URL. Share the Network URL, for example `http://192.168.1.71:5173`, with anyone on the same network.
 - API calls go to `/api` and Vite forwards them to `VITE_API_PROXY_TARGET`, so teammates only need the frontend URL.
 
 ## Environment
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `VITE_APP_NAME` | Tamilzorous Telematics | App name |
-| `VITE_PORT` | 5173 | Dev server port |
-| `VITE_API_URL` | /api | API base path used by the browser |
-| `VITE_API_PROXY_TARGET` | http://localhost:3000 | Backend address the dev server forwards `/api` to |
-| `VITE_MQTT_URL` | mqtt://broker.hivemq.com:1883 | Broker URL, same as the backend and Postman. The console connects to it over WebSocket (port 8884) because browsers cannot open raw MQTT connections |
-| `VITE_MQTT_TOPIC_FILTER` | telematics/+/telemetry | Topic the API listens to |
-| `VITE_TIMEZONE` | Asia/Kolkata | Time zone for displayed times |
-| `VITE_ONLINE_WINDOW_SECONDS` | 120 | A device counts as online if seen within this time |
-| `VITE_REFRESH_INTERVAL_SECONDS` | 10 | Auto-refresh interval for live data |
+| Variable                        | Default               | Purpose                                              |
+| ------------------------------- | --------------------- | ---------------------------------------------------- |
+| `VITE_APP_NAME`                 | Tamilzorous School    | App name                                             |
+| `VITE_PORT`                     | 5173                  | Dev server port                                      |
+| `VITE_API_URL`                  | /api/v1               | API base path used by the browser                    |
+| `VITE_API_PROXY_TARGET`         | http://localhost:3000 | School API address the dev server forwards `/api` to |
+| `VITE_TIMEZONE`                 | Asia/Kolkata          | Time zone for displayed times                        |
+| `VITE_REFRESH_INTERVAL_SECONDS` | 10                    | Auto-refresh interval for live bus data              |
 
 ## Pages
 
-| Page | Path | What it does |
-|---|---|---|
-| Dashboard | `/` | Device counts, live map, recent activity, latest readings |
-| Devices | `/devices` | Search, register, edit and delete devices |
-| Device detail | `/devices/:id` | Position on a map, latest reading, history with date filters |
-| MQTT console | `/console` | Connect to the broker, subscribe, publish (with repeat), inspect messages |
+| Group         | Pages                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------- |
+| Overview      | Dashboard: students, applications, staff, buses moving, live bus map                                  |
+| People        | Students (profile with documents, health, behaviour), Admissions, Parents, Staff, Teacher assignments |
+| Communication | Notifications outbox                                                                                  |
+| Fleet         | Bus tracking: live status (moving, stopped, offline), map, recent positions (read-only)               |
+| Settings      | School setup, Schools (super admin), Users and access                                                 |
 
 ## Keyboard shortcuts
 
-Press `Shift + ?` in the app for the full list.
+Press `Shift + ?` in the app for the full list. `G` then a letter jumps to a page (for example `G S` students, `G T` staff, `G B` bus tracking).
 
-| Keys | Action |
-|---|---|
-| `G` then `D` / `V` / `M` | Go to dashboard / devices / MQTT console |
-| `/` | Focus search |
-| `Alt + N` | Register a device |
-| `Alt + R` | Refresh data |
-| `Alt + T` | Switch light or dark theme |
-| `Ctrl + B` | Collapse or expand the sidebar |
-| `Ctrl + S` | Save the open form |
-| `Alt + C` | Connect or disconnect (console) |
-| `Ctrl + Enter` | Publish (console) |
-| `Alt + P` / `Alt + L` | Pause / clear the message stream (console) |
-| `↑ ↓` or `J K`, `Enter`, `E`, `Del` | Move through, open, edit and delete table rows |
+## Regression tests
+
+`npm run test:regression` runs the API checks, the browser checks (Chrome via Playwright) and the backend unit tests, then rebuilds the Excel trackers in `C:/Users/DELL/Unit Testing/School Management System` and `C:/Users/DELL/Unit Testing/Telematics Service`, and removes the test records it created. Scripts are in `e2e/`.
 
 ## Structure
 
@@ -64,14 +52,12 @@ src/
   main.tsx, router.tsx        bootstrap and routes (pages are lazy-loaded)
   config/                     env, navigation, shortcut list
   lib/api/                    axios client, ApiError + toApiError, query client
-  lib/                        alerts (toasts), formatting, shortcut parsing, utils
-  providers/                  theme
-  components/ui/              Button, Card, Input, Dialog, Table, Badge, Switch, Skeleton
-  components/common/          Page, PageHeader, StatCard, EmptyState, ErrorState, AppModal,
-                              ConfirmDialog, Pagination, FormField, FleetMap, BrandLogo
-  components/layout/          sidebar, header, system status, toaster
-  components/shortcuts/       shortcut provider, hooks, Kbd, help dialog
+  lib/                        alerts (toasts), formatting, files, utils
+  components/ui/              Button, Card, Input, Dialog, Sheet, Table, Badge, Switch, Skeleton
+  components/common/          Page, DataTable, InsightCards, Combobox, AppModal, DocumentList, FleetMap, ...
+  components/layout/          sidebar, header, school switcher, toaster
   features/<name>/            api.ts (types + query hooks), components/, pages/
+e2e/                          regression scripts and Excel tracker builder
 ```
 
 ## Error handling
@@ -82,8 +68,8 @@ src/
 
 ## Scripts
 
-| Script | Purpose |
-|---|---|
-| `start:local:win` / `dev` | Dev server on the local network |
-| `build` / `preview` | Production build and local preview |
-| `lint` / `format` / `typecheck` | ESLint, Prettier, TypeScript |
+| Script                          | Purpose                            |
+| ------------------------------- | ---------------------------------- |
+| `start:local:win` / `dev`       | Dev server on the local network    |
+| `build` / `preview`             | Production build and local preview |
+| `lint` / `format` / `typecheck` | ESLint, Prettier, TypeScript       |

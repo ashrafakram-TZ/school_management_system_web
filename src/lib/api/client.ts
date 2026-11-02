@@ -73,6 +73,14 @@ const refreshAccessToken = () => {
 http.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const body = (error as { response?: { data?: unknown } }).response?.data
+    if (body instanceof Blob && body.type.includes('json')) {
+      const parsed = await body
+        .text()
+        .then((text) => JSON.parse(text) as unknown)
+        .catch(() => null)
+      if (parsed) (error as { response: { data: unknown } }).response.data = parsed
+    }
     const apiError = toApiError(error)
     const request = (error as { config?: RetriableConfig }).config
     const isPublic = PUBLIC_PATHS.includes(request?.url ?? '')
@@ -112,4 +120,15 @@ export const api = {
   put: <T>(url: string, body?: unknown) => http.put<ApiEnvelope<T>>(url, body).then(unwrap),
   delete: <T>(url: string, params?: QueryParams) =>
     http.delete<ApiEnvelope<T>>(url, { params: clean(params) }).then(unwrap),
+  upload: <T>(url: string, form: FormData) =>
+    http
+      .post<ApiEnvelope<T>>(url, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000,
+      })
+      .then(unwrap),
+  blob: (url: string, params?: QueryParams) =>
+    http
+      .get<Blob>(url, { params: clean(params), responseType: 'blob', timeout: 120000 })
+      .then((response) => response.data),
 }

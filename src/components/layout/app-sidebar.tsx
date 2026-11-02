@@ -1,13 +1,11 @@
 import { Link } from '@tanstack/react-router'
 import { X } from 'lucide-react'
 import { BrandLogo, BrandMark } from '@/components/common/brand-logo'
-import { Kbd } from '@/components/shortcuts/kbd'
 import { Button } from '@/components/ui/button'
 import { NAV_GROUPS } from '@/config/nav'
 import { can, type Me } from '@/features/auth/api'
 import { cn } from '@/lib/utils'
 import { SchoolSwitcher } from './school-switcher'
-import { SystemStatus } from './system-status'
 
 interface AppSidebarProps {
   me: Me
@@ -62,13 +60,13 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
         </div>
 
         {can(me, 'platform.schools') ? (
-          <div className={cn('px-5 pt-4', collapsed && 'md:hidden')}>
+          <div className={cn('shrink-0 px-4 pt-3', collapsed && 'md:hidden')}>
             <SchoolSwitcher />
           </div>
         ) : (
           me.school && (
-            <div className={cn('px-5 pt-4', collapsed && 'md:hidden')}>
-              <div className='rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2.5'>
+            <div className={cn('shrink-0 px-4 pt-3', collapsed && 'md:hidden')}>
+              <div className='rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2'>
                 <div className='truncate text-xs font-bold text-sidebar-accent-foreground'>
                   {me.school.name}
                 </div>
@@ -78,19 +76,19 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
           )
         )}
 
-        <nav className='flex-1 overflow-y-auto px-3 py-4'>
-          <div className='grid gap-5'>
+        <nav className='sidebar-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3'>
+          <div className='grid min-w-0 gap-3.5'>
             {groups.map((group) => (
-              <div key={group.label} className='grid gap-1'>
+              <div key={group.label} className='grid min-w-0 gap-0.5'>
                 <div
                   className={cn(
-                    'px-3 pb-1 text-[10px] font-bold tracking-[0.14em] text-sidebar-muted uppercase',
+                    'px-3 pb-0.5 text-[10px] font-bold tracking-[0.14em] text-sidebar-muted uppercase',
                     collapsed && 'md:sr-only'
                   )}
                 >
                   {group.label}
                 </div>
-                <ul className='grid gap-1'>
+                <ul className='grid min-w-0 gap-0.5'>
                   {group.items.map((item) => (
                     <li key={item.to}>
                       <Link
@@ -99,7 +97,7 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
                         activeOptions={{ exact: item.to === '/' }}
                         title={collapsed ? item.label : undefined}
                         className={cn(
-                          'group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-primary',
+                          'group relative flex h-9 min-w-0 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-primary',
                           'data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground',
                           collapsed && 'md:justify-center md:px-0'
                         )}
@@ -115,17 +113,11 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
                                 isActive && 'text-sidebar-primary'
                               )}
                             />
-                            <span className={cn('truncate', collapsed && 'md:hidden')}>
+                            <span
+                              className={cn('min-w-0 flex-1 truncate', collapsed && 'md:hidden')}
+                            >
                               {item.label}
                             </span>
-                            <Kbd
-                              id={item.shortcut}
-                              inverted
-                              className={cn(
-                                'ml-auto opacity-0 transition-opacity group-hover:opacity-100',
-                                collapsed && 'md:hidden'
-                              )}
-                            />
                           </>
                         )}
                       </Link>
@@ -136,15 +128,6 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
             ))}
           </div>
         </nav>
-
-        <div className='shrink-0 p-3'>
-          <div className={cn(collapsed && 'md:hidden')}>
-            <SystemStatus />
-          </div>
-          <div className={cn('hidden', collapsed && 'md:block')}>
-            <SystemStatus compact />
-          </div>
-        </div>
       </aside>
     </>
   )

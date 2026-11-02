@@ -81,7 +81,7 @@ function ApplicationForm({
     if (!draft.gender) next.gender = 'Choose a gender'
     if (draft.guardian_name.trim().length < 2) next.guardian_name = 'Enter the parent name'
     if (!/^[6-9]\d{9}$/.test(draft.guardian_mobile))
-      next.guardian_mobile = 'Enter a valid 10-digit mobile'
+      next.guardian_mobile = 'Enter a valid 10-digit mobile number'
     setErrors(next)
     if (Object.keys(next).length) return
     try {

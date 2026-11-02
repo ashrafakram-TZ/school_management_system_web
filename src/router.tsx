@@ -15,8 +15,14 @@ import { GeneralErrorPage, NotFoundPage } from '@/features/errors/error-pages'
 import { outboxSearchSchema } from '@/features/notifications/search'
 import { setupSearchSchema } from '@/features/setup/search'
 import {
+  assignmentsSearchSchema,
+  staffProfileSearchSchema,
+  staffSearchSchema,
+} from '@/features/staff/search'
+import {
   admissionsSearchSchema,
   guardiansSearchSchema,
+  studentProfileSearchSchema,
   studentsSearchSchema,
 } from '@/features/students/search'
 import { usersSearchSchema } from '@/features/users/search'
@@ -74,31 +80,10 @@ const notificationsRoute = createRoute({
   ),
 })
 
-const devicesRoute = createRoute({
+const fleetRoute = createRoute({
   getParentRoute: () => appRoute,
-  path: '/devices',
-  component: lazyRouteComponent(
-    () => import('@/features/devices/pages/devices-page'),
-    'DevicesPage'
-  ),
-})
-
-const deviceDetailRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/devices/$deviceId',
-  component: lazyRouteComponent(
-    () => import('@/features/devices/pages/device-detail-page'),
-    'DeviceDetailPage'
-  ),
-})
-
-const consoleRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/console',
-  component: lazyRouteComponent(
-    () => import('@/features/mqtt-console/pages/mqtt-console-page'),
-    'MqttConsolePage'
-  ),
+  path: '/fleet',
+  component: lazyRouteComponent(() => import('@/features/fleet/pages/fleet-page'), 'FleetPage'),
 })
 
 const studentsRoute = createRoute({
@@ -108,6 +93,16 @@ const studentsRoute = createRoute({
   component: lazyRouteComponent(
     () => import('@/features/students/pages/students-page'),
     'StudentsPage'
+  ),
+})
+
+const studentRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/students/$studentId',
+  validateSearch: studentProfileSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/students/pages/student-page'),
+    'StudentPage'
   ),
 })
 
@@ -128,6 +123,33 @@ const guardiansRoute = createRoute({
   component: lazyRouteComponent(
     () => import('@/features/students/pages/guardians-page'),
     'GuardiansPage'
+  ),
+})
+
+const staffRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/staff',
+  validateSearch: staffSearchSchema,
+  component: lazyRouteComponent(() => import('@/features/staff/pages/staff-page'), 'StaffPage'),
+})
+
+const staffAssignmentsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/staff/assignments',
+  validateSearch: assignmentsSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/staff/pages/assignments-page'),
+    'AssignmentsPage'
+  ),
+})
+
+const staffProfileRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/staff/$staffId',
+  validateSearch: staffProfileSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/staff/pages/staff-profile-page'),
+    'StaffProfilePage'
   ),
 })
 
@@ -152,15 +174,17 @@ const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
     dashboardRoute,
     studentsRoute,
+    studentRoute,
     admissionsRoute,
     guardiansRoute,
+    staffRoute,
+    staffAssignmentsRoute,
+    staffProfileRoute,
     setupRoute,
     schoolsRoute,
     usersRoute,
     notificationsRoute,
-    devicesRoute,
-    deviceDetailRoute,
-    consoleRoute,
+    fleetRoute,
   ]),
 ])
 

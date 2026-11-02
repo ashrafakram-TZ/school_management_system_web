@@ -1,352 +1,196 @@
-import { useMemo, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
-import { Activity, ArrowRight, Plus, Server, Truck, Wifi, WifiOff } from 'lucide-react'
-import { EmptyState, ErrorState, StatCard } from '@/components/common/display'
-import { FleetMap, type MapPoint } from '@/components/common/fleet-map'
-import { Page, PageHeader } from '@/components/common/page'
-import { useSystemStatus } from '@/components/layout/use-system-status'
-import { useShortcut } from '@/components/shortcuts/shortcut-context'
-import { Kbd } from '@/components/shortcuts/kbd'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Link } from '@tanstack/react-router'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { config } from '@/config/env'
-import { useNow } from '@/hooks/use-now'
-import { formatDateTime, formatNumber, timeAgo } from '@/lib/format'
-import { useDevices, type Device } from '@/features/devices/api'
-import { DeviceFormModal } from '@/features/devices/components/device-form-modal'
-import { DeviceStatusBadge } from '@/features/devices/components/device-status-badge'
-import { DEVICE_STATUS, getDeviceStatus, type DeviceStatus } from '@/features/devices/status'
-import { useLatestTelemetryMany, type Telemetry } from '@/features/telemetry/api'
+  ArrowRight,
+  Bus,
+  ClipboardList,
+  GraduationCap,
+  UserRoundCheck,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react'
+import { ErrorState } from '@/components/common/display'
+import { FleetMap } from '@/components/common/fleet-map'
+import { Page, PageHeader } from '@/components/common/page'
+import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { can, useMe } from '@/features/auth/api'
+import { useFleetLive, VEHICLE_STATE } from '@/features/fleet/api'
+import { useStaffInsights } from '@/features/staff/api'
+import { useAdmissionInsights, useStudentInsights } from '@/features/students/api'
+import { formatNumber } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
-interface Row {
-  device: Device
-  status: DeviceStatus
-  latest: Telemetry | null
-}
+type TileLink =
+  | { to: '/students'; search: { page: number } }
+  | { to: '/admissions'; search: { page: number } }
+  | { to: '/staff'; search: { page: number } }
+  | { to: '/fleet' }
 
 export function DashboardPage() {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const now = useNow(5_000)
-  const system = useSystemStatus()
-  const [createOpen, setCreateOpen] = useState(false)
-
-  const devices = useDevices({ page: 1, limit: 100 }, { live: true })
-  const list = useMemo(() => devices.data?.items ?? [], [devices.data])
-  const tracked = useMemo(() => list.filter((device) => device.last_seen_at), [list])
-  const latestList = useLatestTelemetryMany(tracked.map((device) => device.id))
-
-  const latestById = useMemo(() => {
-    const map = new Map<number, Telemetry>()
-    latestList.forEach((reading, index) => {
-      if (reading && tracked[index]) map.set(tracked[index].id, reading)
-    })
-    return map
-  }, [latestList, tracked])
-
-  const rows: Row[] = useMemo(
-    () =>
-      list.map((device) => ({
-        device,
-        status: getDeviceStatus(device, now),
-        latest: latestById.get(device.id) ?? null,
-      })),
-    [list, latestById, now]
-  )
-
-  const counts = useMemo(
-    () =>
-      rows.reduce((total, row) => ({ ...total, [row.status]: total[row.status] + 1 }), {
-        online: 0,
-        offline: 0,
-        never: 0,
-        inactive: 0,
-      } as Record<DeviceStatus, number>),
-    [rows]
-  )
-
-  const points: MapPoint[] = useMemo(
-    () =>
-      rows
-        .filter((row) => row.latest)
-        .map((row) => ({
-          id: row.device.id,
-          lat: row.latest!.lat,
-          lng: row.latest!.lng,
-          label: row.device.name,
-          sublabel: `${DEVICE_STATUS[row.status].label} · ${formatNumber(row.latest!.speed, 0, 'km/h')}`,
-          color: DEVICE_STATUS[row.status].color,
-        })),
-    [rows]
-  )
-
-  const recent = useMemo(
-    () =>
-      [...rows]
-        .filter((row) => row.device.last_seen_at)
-        .sort(
-          (a, b) =>
-            new Date(b.device.last_seen_at!).getTime() - new Date(a.device.last_seen_at!).getTime()
-        )
-        .slice(0, 6),
-    [rows]
-  )
-
-  const refresh = () => queryClient.invalidateQueries()
-  const openDevice = (id: number) =>
-    navigate({ to: '/devices/$deviceId', params: { deviceId: String(id) } })
-
-  useShortcut('app.refresh', refresh)
-  useShortcut('devices.create', () => setCreateOpen(true))
-
-  const loading = devices.isPending
-  const total = devices.data?.total ?? 0
-
+  const me = useMe().data
+  const firstName = me?.name.split(' ')[0] ?? ''
   return (
     <Page>
       <PageHeader
-        eyebrow='Fleet overview'
-        title='Dashboard'
-        description={`Live view of every registered tracker. Updates every ${config.refreshIntervalMs / 1000} seconds.`}
-        actions={
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus />
-            Register device
-            <Kbd id='devices.create' inverted />
-          </Button>
-        }
+        eyebrow='Overview'
+        title={`Good ${greeting()}, ${firstName}`}
+        description='Today at a glance: students, admissions, staff and buses.'
       />
-
-      <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
-        <StatCard
-          label='Registered devices'
-          value={total}
-          hint={`${total - counts.inactive} accepting telemetry`}
-          icon={Truck}
-          loading={loading}
-        />
-        <StatCard
-          label='Online now'
-          value={counts.online}
-          hint={`Seen in the last ${config.onlineWindowMs / 60_000} minutes`}
-          icon={Wifi}
-          tone='success'
-          loading={loading}
-        />
-        <StatCard
-          label='Offline'
-          value={counts.offline + counts.never}
-          hint={`${counts.never} never reported`}
-          icon={WifiOff}
-          tone={counts.offline + counts.never > 0 ? 'warning' : 'neutral'}
-          loading={loading}
-        />
-        <StatCard
-          label='Backend'
-          value={system.loading ? '…' : system.allUp ? 'Healthy' : 'Issue'}
-          hint={`API ${system.api} · DB ${system.db} · MQTT ${system.mqtt}`}
-          icon={Server}
-          tone={system.loading ? 'neutral' : system.allUp ? 'success' : 'danger'}
-        />
+      <div className='grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4'>
+        {can(me, 'students.view') && <StudentTiles />}
+        {can(me, 'staff.view') && <StaffTile />}
+        {can(me, 'fleet.view') && <BusTile />}
       </div>
-
-      {devices.isError && !devices.data ? (
-        <Card>
-          <ErrorState message={devices.error.message} onRetry={() => devices.refetch()} />
-        </Card>
-      ) : (
-        <>
-          <div className='grid gap-6 xl:grid-cols-3'>
-            <Card className='xl:col-span-2'>
-              <CardHeader>
-                <div className='grid gap-1'>
-                  <CardTitle>Live positions</CardTitle>
-                  <CardDescription>
-                    Last known location of each tracker. Click a dot to open it.
-                  </CardDescription>
-                </div>
-                <div className='flex flex-wrap gap-2'>
-                  {(['online', 'offline', 'inactive'] as const).map((status) => (
-                    <Badge key={status} tone={DEVICE_STATUS[status].tone} dot>
-                      {DEVICE_STATUS[status].label}
-                    </Badge>
-                  ))}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <FleetMap
-                  points={points}
-                  onSelect={openDevice}
-                  className='h-80 sm:h-[420px]'
-                  emptyText={
-                    loading
-                      ? 'Loading positions…'
-                      : 'No positions yet. Publish a reading to see it here.'
-                  }
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className='grid gap-1'>
-                  <CardTitle className='flex items-center gap-2'>
-                    <Activity className='size-4 text-muted-foreground' />
-                    Recent activity
-                  </CardTitle>
-                  <CardDescription>Devices that reported most recently</CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className='pt-3'>
-                {loading ? (
-                  <div className='grid gap-2'>
-                    {Array.from({ length: 4 }, (_, index) => (
-                      <Skeleton key={index} className='h-14' />
-                    ))}
-                  </div>
-                ) : recent.length === 0 ? (
-                  <EmptyState
-                    icon={Activity}
-                    title='No activity yet'
-                    description='Readings appear here as soon as a registered device publishes.'
-                    className='py-8'
-                  />
-                ) : (
-                  <ul className='grid gap-1'>
-                    {recent.map((row) => (
-                      <li key={row.device.id}>
-                        <Link
-                          to='/devices/$deviceId'
-                          params={{ deviceId: String(row.device.id) }}
-                          className='flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors outline-none hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/40'
-                        >
-                          <span
-                            className='size-2.5 shrink-0 rounded-full'
-                            style={{ background: DEVICE_STATUS[row.status].color }}
-                          />
-                          <span className='grid min-w-0 flex-1 gap-0.5'>
-                            <span className='truncate text-sm font-bold'>{row.device.name}</span>
-                            <span className='truncate font-mono text-[11px] text-muted-foreground'>
-                              {row.device.imei}
-                            </span>
-                          </span>
-                          <span
-                            className='text-xs whitespace-nowrap text-muted-foreground'
-                            title={formatDateTime(row.device.last_seen_at)}
-                          >
-                            {timeAgo(row.device.last_seen_at, now)}
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className='overflow-hidden'>
-            <CardHeader className='pb-4'>
-              <div className='grid gap-1'>
-                <CardTitle>Latest readings</CardTitle>
-                <CardDescription>
-                  The most recent message from every registered device
-                </CardDescription>
-              </div>
-              <Button asChild variant='ghost' size='sm'>
-                <Link to='/devices'>
-                  All devices
-                  <ArrowRight />
-                </Link>
-              </Button>
-            </CardHeader>
-            {loading ? (
-              <div className='grid gap-2 p-4'>
-                {Array.from({ length: 3 }, (_, index) => (
-                  <Skeleton key={index} className='h-10' />
-                ))}
-              </div>
-            ) : rows.length === 0 ? (
-              <EmptyState
-                icon={Truck}
-                title='No devices registered'
-                description='Register a tracker, then publish to its MQTT topic.'
-                action={
-                  <Button onClick={() => setCreateOpen(true)}>
-                    <Plus />
-                    Register device
-                  </Button>
-                }
-              />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className='hover:bg-transparent'>
-                    <TableHead>Device</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className='text-right'>Speed</TableHead>
-                    <TableHead className='hidden sm:table-cell'>Ignition</TableHead>
-                    <TableHead className='hidden text-right md:table-cell'>Fuel</TableHead>
-                    <TableHead className='hidden lg:table-cell'>Recorded</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow
-                      key={row.device.id}
-                      tabIndex={0}
-                      className='cursor-pointer outline-none focus-visible:bg-accent/60'
-                      onClick={() => openDevice(row.device.id)}
-                      onKeyDown={(event) => event.key === 'Enter' && openDevice(row.device.id)}
-                    >
-                      <TableCell>
-                        <div className='grid gap-0.5'>
-                          <span className='font-bold'>{row.device.name}</span>
-                          <span className='font-mono text-[11px] text-muted-foreground'>
-                            {row.device.imei}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <DeviceStatusBadge status={row.status} />
-                      </TableCell>
-                      <TableCell className='tabular text-right'>
-                        {formatNumber(row.latest?.speed, 0, 'km/h')}
-                      </TableCell>
-                      <TableCell className='hidden sm:table-cell'>
-                        {row.latest?.ignition === undefined || row.latest?.ignition === null
-                          ? '—'
-                          : row.latest.ignition
-                            ? 'On'
-                            : 'Off'}
-                      </TableCell>
-                      <TableCell className='tabular hidden text-right md:table-cell'>
-                        {formatNumber(row.latest?.fuel, 0, '%')}
-                      </TableCell>
-                      <TableCell className='hidden text-muted-foreground lg:table-cell'>
-                        {row.latest ? formatDateTime(row.latest.recorded_at) : 'No readings yet'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Card>
-        </>
-      )}
-
-      <DeviceFormModal open={createOpen} onOpenChange={setCreateOpen} />
+      {can(me, 'fleet.view') && <BusMap />}
     </Page>
+  )
+}
+
+function greeting() {
+  const hour = Number(
+    new Date().toLocaleString('en-IN', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' })
+  )
+  return hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
+}
+
+function Tile({
+  link,
+  label,
+  value,
+  hint,
+  icon: Icon,
+  tone,
+  loading,
+}: {
+  link: TileLink
+  label: string
+  value: string | number
+  hint: string
+  icon: LucideIcon
+  tone: string
+  loading?: boolean
+}) {
+  return (
+    <Link
+      {...link}
+      className='group grid gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none sm:p-5'
+    >
+      <div className='flex items-start justify-between gap-2'>
+        <span className='text-sm font-semibold text-muted-foreground'>{label}</span>
+        <span className={cn('grid size-9 place-items-center rounded-lg', tone)}>
+          <Icon className='size-4' />
+        </span>
+      </div>
+      {loading ? (
+        <Skeleton className='h-8 w-16' />
+      ) : (
+        <span className='tabular text-3xl font-extrabold tracking-tight'>{value}</span>
+      )}
+      <span className='flex items-center justify-between gap-2 text-xs text-muted-foreground'>
+        {hint}
+        <ArrowRight className='size-3.5 opacity-0 transition-opacity group-hover:opacity-100' />
+      </span>
+    </Link>
+  )
+}
+
+function StudentTiles() {
+  const students = useStudentInsights()
+  const admissions = useAdmissionInsights()
+  return (
+    <>
+      <Tile
+        link={{ to: '/students', search: { page: 1 } }}
+        label='Students'
+        value={formatNumber(students.data?.total)}
+        hint={`${students.data?.new_this_month ?? 0} joined this month`}
+        icon={GraduationCap}
+        tone='bg-primary/10 text-primary'
+        loading={students.isPending}
+      />
+      <Tile
+        link={{ to: '/admissions', search: { page: 1 } }}
+        label='Applications waiting'
+        value={formatNumber(admissions.data?.applied)}
+        hint={`${admissions.data?.approved ?? 0} approved, not enrolled`}
+        icon={ClipboardList}
+        tone='bg-info/10 text-info'
+        loading={admissions.isPending}
+      />
+    </>
+  )
+}
+
+function StaffTile() {
+  const staff = useStaffInsights()
+  const attention = staff.data?.need_attention ?? 0
+  return (
+    <Tile
+      link={{ to: '/staff', search: { page: 1 } }}
+      label='Staff'
+      value={formatNumber(staff.data?.total_staff)}
+      hint={attention ? `${attention} need attention` : 'All records complete'}
+      icon={attention ? UsersRound : UserRoundCheck}
+      tone={attention ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'}
+      loading={staff.isPending}
+    />
+  )
+}
+
+function BusTile() {
+  const live = useFleetLive()
+  return (
+    <Tile
+      link={{ to: '/fleet' }}
+      label='Buses moving'
+      value={live.isError ? '—' : `${live.data?.moving ?? 0}/${live.data?.total ?? 0}`}
+      hint={live.isError ? 'Bus tracking is not reachable' : `${live.data?.offline ?? 0} offline`}
+      icon={Bus}
+      tone='bg-success/10 text-success'
+      loading={live.isPending}
+    />
+  )
+}
+
+function BusMap() {
+  const live = useFleetLive()
+  const vehicles = live.data?.vehicles ?? []
+  return (
+    <Card className='overflow-hidden'>
+      <div className='flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-5'>
+        <div className='grid'>
+          <h2 className='font-bold'>Buses now</h2>
+          <p className='text-xs text-muted-foreground'>Live positions from bus tracking</p>
+        </div>
+        <div className='flex flex-wrap gap-1.5'>
+          {vehicles.slice(0, 6).map((vehicle) => (
+            <Badge key={vehicle.id} tone={VEHICLE_STATE[vehicle.state].tone} dot>
+              {vehicle.name}
+            </Badge>
+          ))}
+        </div>
+      </div>
+      {live.isError ? (
+        <ErrorState message={live.error.message} onRetry={() => live.refetch()} />
+      ) : live.isPending ? (
+        <Skeleton className='h-80 rounded-none' />
+      ) : (
+        <FleetMap
+          className='h-80'
+          emptyText='No bus has sent its position yet'
+          points={vehicles
+            .filter((vehicle) => vehicle.position)
+            .map((vehicle) => ({
+              id: vehicle.id,
+              lat: vehicle.position!.lat,
+              lng: vehicle.position!.lng,
+              label: vehicle.name,
+              sublabel: VEHICLE_STATE[vehicle.state].label,
+              color: VEHICLE_STATE[vehicle.state].color,
+            }))}
+        />
+      )}
+    </Card>
   )
 }

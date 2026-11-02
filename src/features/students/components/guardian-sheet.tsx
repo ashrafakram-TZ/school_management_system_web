@@ -112,7 +112,11 @@ export function GuardianSheet({
                       <button
                         type='button'
                         onClick={() =>
-                          void navigate({ to: '/students', search: { page: 1, student: child.id } })
+                          void navigate({
+                            to: '/students/$studentId',
+                            params: { studentId: String(child.id) },
+                            search: { tab: 'profile' },
+                          })
                         }
                         className='flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none'
                       >
@@ -249,9 +253,10 @@ function EditGuardianModal({
           event.preventDefault()
           const next: Record<string, string> = {}
           if (draft.name.trim().length < 2) next.name = 'Enter the full name'
-          if (!/^[6-9]\d{9}$/.test(draft.mobile)) next.mobile = 'Enter a valid 10-digit mobile'
+          if (!/^[6-9]\d{9}$/.test(draft.mobile))
+            next.mobile = 'Enter a valid 10-digit mobile number'
           if (draft.alt_mobile && !/^[6-9]\d{9}$/.test(draft.alt_mobile))
-            next.alt_mobile = 'Enter a valid 10-digit mobile'
+            next.alt_mobile = 'Enter a valid 10-digit mobile number'
           if (draft.pincode && !/^\d{6}$/.test(draft.pincode))
             next.pincode = 'Pincode must be 6 digits'
           setErrors(next)

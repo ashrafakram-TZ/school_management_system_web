@@ -185,7 +185,11 @@ export function AdmissionsPage() {
           variant='ghost'
           onClick={(event) => {
             event.stopPropagation()
-            void navigate({ to: '/students', search: { page: 1, student: admission.student_id! } })
+            void navigate({
+              to: '/students/$studentId',
+              params: { studentId: String(admission.student_id!) },
+              search: { tab: 'profile' },
+            })
           }}
         >
           Open student

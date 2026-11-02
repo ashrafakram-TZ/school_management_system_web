@@ -20,7 +20,6 @@ export const studentsSearchSchema = z.object({
     .optional()
     .catch(undefined),
   order,
-  student: id,
 })
 
 export const admissionsSearchSchema = z.object({
@@ -41,6 +40,20 @@ export const guardiansSearchSchema = z.object({
   sort: z.enum(['name', 'created_at', 'last_login_at']).optional().catch(undefined),
   order,
   parent: id,
+})
+
+export const STUDENT_TABS = [
+  'profile',
+  'guardians',
+  'documents',
+  'health',
+  'behaviour',
+  'transport',
+] as const
+export type StudentTab = (typeof STUDENT_TABS)[number]
+
+export const studentProfileSearchSchema = z.object({
+  tab: z.enum(STUDENT_TABS).catch('profile'),
 })
 
 export type StudentsSearch = z.infer<typeof studentsSearchSchema>

@@ -118,7 +118,7 @@ function StudentForm({
     guardians.forEach((guardian, index) => {
       if (guardian.name.trim().length < 2) next[`guardians.${index}.name`] = 'Enter the full name'
       if (!/^[6-9]\d{9}$/.test(guardian.mobile))
-        next[`guardians.${index}.mobile`] = 'Enter a valid 10-digit mobile'
+        next[`guardians.${index}.mobile`] = 'Enter a valid 10-digit mobile number'
     })
     setErrors(next)
     return Object.keys(next).length === 0

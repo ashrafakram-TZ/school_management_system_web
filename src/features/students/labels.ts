@@ -26,6 +26,17 @@ export const ADMISSION_STATUS: Record<AdmissionStatus, { label: string; tone: Ba
   enrolled: { label: 'Enrolled', tone: 'success' },
 }
 
+export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  birth_certificate: 'Birth certificate',
+  aadhaar: 'Aadhaar card',
+  transfer_certificate: 'Transfer certificate',
+  previous_marksheet: 'Previous mark sheet',
+  community_certificate: 'Community certificate',
+  medical_certificate: 'Medical certificate',
+  photo: 'Photo',
+  other: 'Other document',
+}
+
 export const BLOOD_GROUPS: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
 export const HOUSES = ['Red', 'Blue', 'Green', 'Yellow']

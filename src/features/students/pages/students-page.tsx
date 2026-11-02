@@ -1,8 +1,12 @@
 import { useState } from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import {
+  ArrowUpCircle,
+  ChevronDown,
   CircleOff,
+  FileSpreadsheet,
   GraduationCap,
+  IdCard,
   ListOrdered,
   Plus,
   Sparkles,
@@ -20,10 +24,17 @@ import { Kbd } from '@/components/shortcuts/kbd'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { can, useMe } from '@/features/auth/api'
 import { useClasses, useSections } from '@/features/setup/api'
 import { alerts } from '@/lib/alerts'
 import { toApiError } from '@/lib/api/errors'
+import { openFile } from '@/lib/files'
 import {
   studentsApi,
   useStudentInsights,
@@ -31,9 +42,11 @@ import {
   useStudents,
   type StudentListItem,
 } from '../api'
+import { ImportWizard } from '../components/import-wizard'
+import { PromotionModal } from '../components/promotion-modal'
 import { StudentFormModal } from '../components/student-form-modal'
-import { StudentSheet } from '../components/student-sheet'
 import { GENDER_LABELS, RELATION_LABELS, classSection, toOptions, yearsLabel } from '../labels'
+import { studentFiles } from '../records-api'
 import type { StudentsSearch } from '../search'
 
 const route = getRouteApi('/_app/students')
@@ -42,13 +55,15 @@ const LIMIT = 20
 export function StudentsPage() {
   const search = route.useSearch()
   const navigate = useNavigate({ from: '/students' })
+  const goTo = useNavigate()
   const me = useMe().data
   const canManage = can(me, 'students.manage')
   const [adding, setAdding] = useState(false)
   const [numbering, setNumbering] = useState(false)
+  const [tool, setTool] = useState<'import' | 'promote' | null>(null)
+  const [printing, setPrinting] = useState(false)
 
-  const { student: openId, ...filters } = search
-  const students = useStudents({ ...filters, limit: LIMIT })
+  const students = useStudents({ ...search, limit: LIMIT })
   const insights = useStudentInsights()
   const classes = useClasses()
   const sections = useSections(search.class_id, Boolean(search.class_id))
@@ -59,8 +74,25 @@ export function StudentsPage() {
 
   const setSearch = (patch: Partial<StudentsSearch>) =>
     navigate({ search: (prev) => ({ ...prev, page: 1, ...patch }), replace: true })
-  const openStudent = (id: number | undefined) =>
-    navigate({ search: (prev) => ({ ...prev, student: id }), replace: true })
+  const openStudent = (id: number) =>
+    goTo({
+      to: '/students/$studentId',
+      params: { studentId: String(id) },
+      search: { tab: 'profile' },
+    })
+  const printCards = async () => {
+    setPrinting(true)
+    try {
+      await openFile(studentFiles.idCards, {
+        class_id: search.section_id ? undefined : search.class_id,
+        section_id: search.section_id,
+      })
+    } catch (error) {
+      alerts.error(toApiError(error).message)
+    } finally {
+      setPrinting(false)
+    }
+  }
   const toggle = (key: 'no_section' | 'has_siblings' | 'new_this_month') =>
     setSearch({
       no_section: undefined,
@@ -225,23 +257,49 @@ export function StudentsPage() {
       <PageHeader
         eyebrow='People'
         title='Students'
-        description='Every student this academic year with their class, roll number and parents. Click a student for the full profile.'
+        description='Every student this academic year with their class, roll number and parents. Open a student for documents, health and behaviour.'
         actions={
-          canManage && (
-            <>
-              {selectedSection && (
-                <Button variant='outline' onClick={() => setNumbering(true)}>
-                  <ListOrdered />
-                  Number {classSection(selectedSection.class_name, selectedSection.name)}
-                </Button>
-              )}
-              <Button onClick={() => setAdding(true)}>
-                <Plus />
-                Add student
-                <Kbd id='students.create' inverted />
+          <>
+            {search.class_id && (
+              <Button variant='outline' loading={printing} onClick={() => void printCards()}>
+                <IdCard />
+                Print ID cards
               </Button>
-            </>
-          )
+            )}
+            {canManage && (
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant='outline'>
+                      Bulk actions
+                      <ChevronDown />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => setTool('import')}>
+                      <FileSpreadsheet />
+                      Import from Excel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setTool('promote')}>
+                      <ArrowUpCircle />
+                      Promote to next year
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {selectedSection && (
+                  <Button variant='outline' onClick={() => setNumbering(true)}>
+                    <ListOrdered />
+                    Number {classSection(selectedSection.class_name, selectedSection.name)}
+                  </Button>
+                )}
+                <Button onClick={() => setAdding(true)}>
+                  <Plus />
+                  Add student
+                  <Kbd id='students.create' inverted />
+                </Button>
+              </>
+            )}
+          </>
         }
       />
 
@@ -360,12 +418,8 @@ export function StudentsPage() {
         onOpenChange={setAdding}
         onCreated={(id) => openStudent(id)}
       />
-      <StudentSheet
-        studentId={openId ?? null}
-        canManage={canManage}
-        onClose={() => openStudent(undefined)}
-        onOpenStudent={(id) => openStudent(id)}
-      />
+      {tool === 'import' && <ImportWizard onClose={() => setTool(null)} />}
+      {tool === 'promote' && <PromotionModal onClose={() => setTool(null)} />}
       <ConfirmDialog
         open={numbering}
         onOpenChange={setNumbering}

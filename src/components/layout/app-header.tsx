@@ -2,12 +2,10 @@ import { useRouterState } from '@tanstack/react-router'
 import { Keyboard, Menu, PanelLeft } from 'lucide-react'
 import { useShortcutHelp } from '@/components/shortcuts/shortcut-context'
 import { Kbd } from '@/components/shortcuts/kbd'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { NAV_GROUPS } from '@/config/nav'
 import type { Me } from '@/features/auth/api'
 import { NotificationBell } from './notification-bell'
-import { useSystemStatus } from './use-system-status'
 import { UserMenu } from './user-menu'
 
 interface AppHeaderProps {
@@ -29,7 +27,6 @@ const findCurrent = (pathname: string) => {
 export function AppHeader({ me, onToggleSidebar, onOpenMobile }: AppHeaderProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const { setHelpOpen } = useShortcutHelp()
-  const status = useSystemStatus()
   const current = findCurrent(pathname)
 
   return (
@@ -61,14 +58,6 @@ export function AppHeader({ me, onToggleSidebar, onOpenMobile }: AppHeaderProps)
       </div>
 
       <div className='ml-auto flex items-center gap-1'>
-        <Badge
-          tone={status.loading ? 'neutral' : status.allUp ? 'success' : 'danger'}
-          dot
-          pulse={status.allUp}
-          className='mr-1 hidden lg:inline-flex'
-        >
-          {status.loading ? 'Checking' : status.allUp ? 'All systems up' : 'Service issue'}
-        </Badge>
         <Button
           variant='ghost'
           size='sm'

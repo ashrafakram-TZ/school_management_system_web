@@ -156,6 +156,16 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+
+  .sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .sidebar-scroll:hover,
+  .sidebar-scroll:focus-within {
+    scrollbar-color: var(--sidebar-border) transparent;
+  }
 }
 
 .leaflet-container {
