@@ -13,6 +13,12 @@ import { queryClient } from '@/lib/api/query-client'
 import { session } from '@/lib/auth/session'
 import { GeneralErrorPage, NotFoundPage } from '@/features/errors/error-pages'
 import { outboxSearchSchema } from '@/features/notifications/search'
+import { setupSearchSchema } from '@/features/setup/search'
+import {
+  admissionsSearchSchema,
+  guardiansSearchSchema,
+  studentsSearchSchema,
+} from '@/features/students/search'
 import { usersSearchSchema } from '@/features/users/search'
 
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -95,10 +101,61 @@ const consoleRoute = createRoute({
   ),
 })
 
+const studentsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/students',
+  validateSearch: studentsSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/students/pages/students-page'),
+    'StudentsPage'
+  ),
+})
+
+const admissionsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admissions',
+  validateSearch: admissionsSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/students/pages/admissions-page'),
+    'AdmissionsPage'
+  ),
+})
+
+const guardiansRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/guardians',
+  validateSearch: guardiansSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/students/pages/guardians-page'),
+    'GuardiansPage'
+  ),
+})
+
+const setupRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/setup',
+  validateSearch: setupSearchSchema,
+  component: lazyRouteComponent(() => import('@/features/setup/pages/setup-page'), 'SetupPage'),
+})
+
+const schoolsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/schools',
+  component: lazyRouteComponent(
+    () => import('@/features/schools/pages/schools-page'),
+    'SchoolsPage'
+  ),
+})
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
     dashboardRoute,
+    studentsRoute,
+    admissionsRoute,
+    guardiansRoute,
+    setupRoute,
+    schoolsRoute,
     usersRoute,
     notificationsRoute,
     devicesRoute,

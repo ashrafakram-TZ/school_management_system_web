@@ -5,6 +5,8 @@
 @import 'leaflet/dist/leaflet.css';
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant tall (@media (min-height: 821px));
+@custom-variant short (@media (max-height: 700px));
 
 :root {
   --background: #f5f7f6;

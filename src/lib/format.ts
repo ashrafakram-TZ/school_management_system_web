@@ -19,6 +19,19 @@ const time = new Intl.DateTimeFormat('en-IN', {
   hour12: false,
 })
 
+const dateOnly = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'UTC',
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+})
+
+export function formatDate(value: string | null | undefined) {
+  if (!value) return '—'
+  const date = new Date(`${value.slice(0, 10)}T00:00:00Z`)
+  return Number.isNaN(date.getTime()) ? '—' : dateOnly.format(date)
+}
+
 const toDate = (value: string | number | Date) => (value instanceof Date ? value : new Date(value))
 
 export function formatDateTime(value: string | number | Date | null | undefined) {

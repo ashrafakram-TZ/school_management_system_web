@@ -1,5 +1,6 @@
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { config } from '@/config/env'
+import { schoolContext } from '@/lib/auth/school-context'
 import { session } from '@/lib/auth/session'
 import { toApiError } from './errors'
 
@@ -39,6 +40,8 @@ http.interceptors.request.use((request) => {
   const current = session.get()
   if (current && !PUBLIC_PATHS.includes(request.url ?? '')) {
     request.headers.set('Authorization', `Bearer ${current.accessToken}`)
+    const schoolId = schoolContext.get()
+    if (schoolId) request.headers.set('X-School-Id', String(schoolId))
   }
   return request
 })
@@ -106,6 +109,7 @@ export const api = {
     http.get<ApiEnvelope<T>>(url, { params: clean(params) }).then(unwrap),
   post: <T>(url: string, body?: unknown) => http.post<ApiEnvelope<T>>(url, body).then(unwrap),
   patch: <T>(url: string, body?: unknown) => http.patch<ApiEnvelope<T>>(url, body).then(unwrap),
+  put: <T>(url: string, body?: unknown) => http.put<ApiEnvelope<T>>(url, body).then(unwrap),
   delete: <T>(url: string, params?: QueryParams) =>
     http.delete<ApiEnvelope<T>>(url, { params: clean(params) }).then(unwrap),
 }

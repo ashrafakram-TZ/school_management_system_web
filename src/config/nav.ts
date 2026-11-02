@@ -1,14 +1,29 @@
 import {
   BellRing,
+  Building2,
+  ClipboardList,
+  GraduationCap,
+  HeartHandshake,
   LayoutDashboard,
   RadioTower,
+  School,
+  ShieldCheck,
   Truck,
-  UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import type { ShortcutId } from './shortcuts'
 
-export type NavPath = '/' | '/users' | '/notifications' | '/devices' | '/console'
+export type NavPath =
+  | '/'
+  | '/students'
+  | '/admissions'
+  | '/guardians'
+  | '/notifications'
+  | '/devices'
+  | '/console'
+  | '/setup'
+  | '/schools'
+  | '/users'
 
 export interface NavItem {
   to: NavPath
@@ -41,12 +56,28 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'People',
     items: [
       {
-        to: '/users',
-        label: 'Users',
-        description: 'Accounts, roles and access',
-        icon: UsersRound,
-        shortcut: 'nav.users',
-        permission: 'users.view',
+        to: '/students',
+        label: 'Students',
+        description: 'Profiles, classes and roll numbers',
+        icon: GraduationCap,
+        shortcut: 'nav.students',
+        permission: 'students.view',
+      },
+      {
+        to: '/admissions',
+        label: 'Admissions',
+        description: 'Applications and enrolment',
+        icon: ClipboardList,
+        shortcut: 'nav.admissions',
+        permission: 'students.view',
+      },
+      {
+        to: '/guardians',
+        label: 'Parents',
+        description: 'Parents and guardians with their children',
+        icon: HeartHandshake,
+        shortcut: 'nav.guardians',
+        permission: 'students.view',
       },
     ],
   },
@@ -81,6 +112,35 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: RadioTower,
         shortcut: 'nav.console',
         permission: 'fleet.manage',
+      },
+    ],
+  },
+  {
+    label: 'Settings',
+    items: [
+      {
+        to: '/setup',
+        label: 'School setup',
+        description: 'Profile, years, classes, subjects, holidays',
+        icon: School,
+        shortcut: 'nav.setup',
+        permission: 'schools.view',
+      },
+      {
+        to: '/schools',
+        label: 'Schools',
+        description: 'Every school on the platform',
+        icon: Building2,
+        shortcut: 'nav.schools',
+        permission: 'platform.schools',
+      },
+      {
+        to: '/users',
+        label: 'Users & access',
+        description: 'Logins, roles and access',
+        icon: ShieldCheck,
+        shortcut: 'nav.users',
+        permission: 'users.view',
       },
     ],
   },

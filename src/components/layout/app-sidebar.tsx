@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { NAV_GROUPS } from '@/config/nav'
 import { can, type Me } from '@/features/auth/api'
 import { cn } from '@/lib/utils'
+import { SchoolSwitcher } from './school-switcher'
 import { SystemStatus } from './system-status'
 
 interface AppSidebarProps {
@@ -60,15 +61,21 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
           </Button>
         </div>
 
-        {me.school && (
+        {can(me, 'platform.schools') ? (
           <div className={cn('px-5 pt-4', collapsed && 'md:hidden')}>
-            <div className='rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2.5'>
-              <div className='truncate text-xs font-bold text-sidebar-accent-foreground'>
-                {me.school.name}
-              </div>
-              <div className='text-[11px] text-sidebar-muted'>School code {me.school.code}</div>
-            </div>
+            <SchoolSwitcher />
           </div>
+        ) : (
+          me.school && (
+            <div className={cn('px-5 pt-4', collapsed && 'md:hidden')}>
+              <div className='rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2.5'>
+                <div className='truncate text-xs font-bold text-sidebar-accent-foreground'>
+                  {me.school.name}
+                </div>
+                <div className='text-[11px] text-sidebar-muted'>School code {me.school.code}</div>
+              </div>
+            </div>
+          )
         )}
 
         <nav className='flex-1 overflow-y-auto px-3 py-4'>
