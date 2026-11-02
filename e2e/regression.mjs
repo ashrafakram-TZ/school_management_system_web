@@ -5,7 +5,7 @@ import { chromium } from 'playwright-core'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5173'
 const CHROME = process.env.E2E_CHROME ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-const DAY = process.env.E2E_DAY ?? 'Day 3'
+const DAY = process.env.E2E_DAY ?? 'Day 4'
 const ROOT = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
 const OUT = path.join(ROOT, 'results')
 const SHOTS = path.join(OUT, 'screenshots')
@@ -54,7 +54,7 @@ let page = admin.page
 
 async function test(meta, fn) {
   const started = Date.now()
-  const row = { ...meta, day: DAY, status: 'Pass', actual: meta.expected, screenshot: '', ms: 0 }
+  const row = { day: DAY, ...meta, status: 'Pass', actual: meta.expected, screenshot: '', ms: 0 }
   try {
     await fn()
   } catch (error) {
@@ -1134,6 +1134,208 @@ const superAdmin = await signedInContext('9999999999', '.auth-super.json')
   page = previous
 }
 
+const D4 = (meta, fn) => test({ ...meta, day: 'Day 4' }, fn)
+const istToday = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10)
+const lastSchoolDay =
+  new Date(`${istToday}T00:00:00Z`).getUTCDay() === 0
+    ? new Date(Date.parse(`${istToday}T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
+    : istToday
+
+await D4(
+  {
+    id: 'AT-01',
+    module: 'Attendance',
+    type: 'View',
+    title: 'Attendance board lists sections with totals',
+    steps: `Open Attendance for ${lastSchoolDay}.`,
+    expected: 'Insight cards and the section list with Class 6 - A',
+  },
+  async () => {
+    await go(`/attendance?tab=students&date=${lastSchoolDay}`)
+    await see('Sections not marked')
+    await see('Class 6 - A')
+  }
+)
+await D4(
+  {
+    id: 'AT-02',
+    module: 'Attendance',
+    type: 'Add',
+    title: 'Mark a section all present and save',
+    steps: 'Click Class 6 - A, click All present, click Save attendance.',
+    expected: 'Toast "Attendance saved"',
+    keepOpen: true,
+  },
+  async () => {
+    await page.getByText('Class 6 - A').locator('visible=true').first().click()
+    await see('Mark attendance', dialog())
+    await click(dialog(), 'All present')
+    await click(dialog(), 'Save attendance')
+    await see(/Attendance saved/)
+  }
+)
+await D4(
+  {
+    id: 'AT-03',
+    module: 'Attendance',
+    type: 'View',
+    title: 'Monthly report of a section',
+    steps: 'In the section sheet, switch to Monthly report.',
+    expected: 'School days marked and a % per student',
+  },
+  async () => {
+    await dialog().getByRole('radio', { name: 'Monthly report' }).click()
+    await see(/school days marked/, dialog())
+  }
+)
+await D4(
+  {
+    id: 'AT-04',
+    module: 'Staff attendance',
+    type: 'Validation',
+    title: 'Correct staff attendance needs a reason',
+    steps: 'Staff tab, click Correct on the first row, Save correction with no reason.',
+    expected: '"Give a reason of at least 3 characters"',
+  },
+  async () => {
+    await go(`/attendance?tab=staff&date=${lastSchoolDay}`)
+    await see('Staff check-ins')
+    await page.getByRole('button', { name: /^Correct attendance for/ }).first().click()
+    await click(dialog(), 'Save correction')
+    await see('Give a reason of at least 3 characters', dialog())
+  }
+)
+await D4(
+  {
+    id: 'AT-05',
+    module: 'Student leave',
+    type: 'Validation',
+    title: 'Rejecting a parent leave request needs a reason',
+    steps: 'Leave requests, Student leave, Reject the waiting request with an empty reason.',
+    expected: '"Give a reason for rejecting"; nothing is saved',
+  },
+  async () => {
+    await go('/attendance?tab=leave&leave=student&status=pending')
+    await page.getByRole('button', { name: /^Reject leave for/ }).first().click()
+    await click(dialog(), /^Reject$/)
+    await see('Give a reason for rejecting', dialog())
+  }
+)
+await D4(
+  {
+    id: 'AT-06',
+    module: 'Staff leave',
+    type: 'View',
+    title: 'Staff leave shows the approval stage',
+    steps: 'Leave requests, Staff leave.',
+    expected: 'The waiting request shows "Waiting for principal"',
+  },
+  async () => {
+    await go('/attendance?tab=leave&leave=staff')
+    await see('Waiting for principal')
+  }
+)
+await D4(
+  {
+    id: 'TT-01',
+    module: 'Timetable',
+    type: 'View',
+    title: 'Timetable builder shows the week and subject plan',
+    steps: 'Open Timetable, choose 6 - A.',
+    expected: 'Grid "Timetable of 6 - A" and the Subject plan panel',
+  },
+  async () => {
+    await go('/timetable?tab=builder')
+    await pick(page, 'Section', '6 - A')
+    await page.getByLabel('Timetable of 6 - A').waitFor({ timeout: 8000 })
+    await see('Subject plan')
+  }
+)
+await D4(
+  {
+    id: 'TT-02',
+    module: 'Timetable',
+    type: 'Validation',
+    title: 'Saving a period needs a subject',
+    steps: 'Click an empty period, Save period with no subject.',
+    expected: '"Choose a subject"',
+  },
+  async () => {
+    await page.getByRole('button', { name: /, empty$/ }).first().click()
+    await click(dialog(), 'Save period')
+    await see('Choose a subject', dialog())
+  }
+)
+await D4(
+  {
+    id: 'TT-03',
+    module: 'Timetable',
+    type: 'Validation',
+    title: 'Teacher clash is blocked',
+    steps: 'Section 6 - B, Monday Period 1, any subject, teacher Priya Venkatesh (teaches 6 - A then), Save period.',
+    expected: 'Toast "Priya Venkatesh already teaches 6 - A in period 1 on Monday"; nothing saved',
+  },
+  async () => {
+    await go('/timetable?tab=builder')
+    await pick(page, 'Section', '6 - B')
+    await page.getByRole('button', { name: /^Monday Period 1/ }).first().click()
+    await dialog().getByRole('combobox', { name: 'Subject' }).click()
+    await page.getByRole('option').first().click()
+    await pick(dialog(), 'Teacher', /^Priya Venkatesh$/)
+    await click(dialog(), 'Save period')
+    await see(/already teaches 6 - A/)
+  }
+)
+await D4(
+  {
+    id: 'TT-06',
+    module: 'Timetable',
+    type: 'View',
+    title: 'Subject picker lists school subjects even when the class has none chosen',
+    steps: 'Builder, Class 12 - A (no class subjects), click Monday Period 1, open Subject.',
+    expected: 'School subjects listed with "Not in class plan", not "No match"',
+  },
+  async () => {
+    await go('/timetable?tab=builder')
+    await pick(page, 'Section', '12 - A')
+    await page.getByRole('button', { name: /^Monday Period 1/ }).first().click()
+    await dialog().getByRole('combobox', { name: 'Subject' }).click()
+    await page.getByRole('option', { name: /Mathematics/ }).first().waitFor({ timeout: 8000 })
+  }
+)
+await D4(
+  {
+    id: 'TT-04',
+    module: 'Timetable',
+    type: 'View',
+    title: 'Workload report',
+    steps: 'Timetable, Workload tab.',
+    expected: 'Teacher workload table with Mon to Sat counts',
+  },
+  async () => {
+    await go('/timetable?tab=workload')
+    await see('Teacher workload')
+    await see('Priya Venkatesh')
+  }
+)
+await D4(
+  {
+    id: 'TT-05',
+    module: 'Timetable',
+    type: 'Validation',
+    title: 'A period in use cannot be removed from the bell schedule',
+    steps: 'Bell schedule, remove Period 8, Save bell schedule.',
+    expected: '"The timetable uses period 8…"; schedule unchanged',
+  },
+  async () => {
+    await go('/timetable?tab=bells')
+    await click(page, 'Remove Period 8')
+    await click(page, 'Save bell schedule')
+    await see(/timetable uses period 8/)
+    await click(page, 'Discard')
+  }
+)
+
 {
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -1145,6 +1347,8 @@ const superAdmin = await signedInContext('9999999999', '.auth-super.json')
     ['RS-01', '/students', 'Aadhavan Senthil'],
     ['RS-02', '/staff', 'Priya Venkatesh'],
     ['RS-03', `${studentUrl || '/students'}`, /Profile|Students/],
+    ['RS-04', '/attendance', 'Sections not marked'],
+    ['RS-05', '/timetable', 'Subject plan'],
   ]) {
     await test(
       {

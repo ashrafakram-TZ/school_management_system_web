@@ -11,6 +11,8 @@ export const SHORTCUTS = {
   'nav.students': { combo: 'g s', label: 'Go to students', group: 'Navigation' },
   'nav.staff': { combo: 'g t', label: 'Go to staff', group: 'Navigation' },
   'nav.assignments': { combo: 'g e', label: 'Go to teacher assignments', group: 'Navigation' },
+  'nav.attendance': { combo: 'g r', label: 'Go to attendance', group: 'Navigation' },
+  'nav.timetable': { combo: 'g w', label: 'Go to timetable', group: 'Navigation' },
   'nav.admissions': { combo: 'g a', label: 'Go to admissions', group: 'Navigation' },
   'nav.guardians': { combo: 'g p', label: 'Go to parents', group: 'Navigation' },
   'nav.setup': { combo: 'g c', label: 'Go to school setup', group: 'Navigation' },

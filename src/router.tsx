@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { AppLayout } from '@/components/layout/app-layout'
 import { queryClient } from '@/lib/api/query-client'
 import { session } from '@/lib/auth/session'
+import { attendanceSearchSchema } from '@/features/attendance/search'
 import { GeneralErrorPage, NotFoundPage } from '@/features/errors/error-pages'
 import { outboxSearchSchema } from '@/features/notifications/search'
 import { setupSearchSchema } from '@/features/setup/search'
@@ -25,6 +26,7 @@ import {
   studentProfileSearchSchema,
   studentsSearchSchema,
 } from '@/features/students/search'
+import { timetableSearchSchema } from '@/features/timetable/search'
 import { usersSearchSchema } from '@/features/users/search'
 
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -153,6 +155,26 @@ const staffProfileRoute = createRoute({
   ),
 })
 
+const attendanceRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/attendance',
+  validateSearch: attendanceSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/attendance/pages/attendance-page'),
+    'AttendancePage'
+  ),
+})
+
+const timetableRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/timetable',
+  validateSearch: timetableSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/timetable/pages/timetable-page'),
+    'TimetablePage'
+  ),
+})
+
 const setupRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/setup',
@@ -180,6 +202,8 @@ const routeTree = rootRoute.addChildren([
     staffRoute,
     staffAssignmentsRoute,
     staffProfileRoute,
+    attendanceRoute,
+    timetableRoute,
     setupRoute,
     schoolsRoute,
     usersRoute,

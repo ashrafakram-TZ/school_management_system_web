@@ -74,6 +74,7 @@ export function useStudents(p: Params) {
 ## Forms
 
 - `AppModal` with a `formId`; the form uses react-hook-form + `zodResolver`.
+- `AppModal` keeps showing its last content while it animates closed, so `{open && <Form />}` inside it is safe (the form still resets on the next open). A raw `Dialog`/`Sheet` does not do this: never unmount its body on close, or the user sees an empty box flash.
 - Client rules match the backend DTO rules.
 - On submit errors, map `apiError.fieldErrors` to `setError(field, ...)`; use the `code` for special cases (for example `MOBILE_TAKEN`); fall back to a root error message.
 - Success: `alerts.success(...)`, close the modal, invalidate the feature's query keys.

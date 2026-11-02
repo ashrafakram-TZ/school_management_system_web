@@ -1,6 +1,8 @@
 import {
   BellRing,
   Building2,
+  CalendarCheck,
+  CalendarRange,
   ClipboardList,
   GraduationCap,
   Grid3x3,
@@ -21,6 +23,8 @@ export type NavPath =
   | '/guardians'
   | '/staff'
   | '/staff/assignments'
+  | '/attendance'
+  | '/timetable'
   | '/notifications'
   | '/fleet'
   | '/setup'
@@ -96,6 +100,27 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Grid3x3,
         shortcut: 'nav.assignments',
         permission: 'staff.view',
+      },
+    ],
+  },
+  {
+    label: 'Academics',
+    items: [
+      {
+        to: '/attendance',
+        label: 'Attendance',
+        description: 'Daily attendance, staff check-ins and leave requests',
+        icon: CalendarCheck,
+        shortcut: 'nav.attendance',
+        permission: 'attendance.view',
+      },
+      {
+        to: '/timetable',
+        label: 'Timetable',
+        description: 'Weekly timetables, teacher workload and the bell schedule',
+        icon: CalendarRange,
+        shortcut: 'nav.timetable',
+        permission: 'timetable.view',
       },
     ],
   },

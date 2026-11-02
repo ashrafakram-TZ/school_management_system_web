@@ -103,5 +103,35 @@
     "status": "Fixed",
     "fix": "All forms now say 'Enter a valid 10-digit mobile number'",
     "retest": "Pass (US-02, ST-01, PG-01, SC-02, SF-01)"
+  },
+  {
+    "id": "BUG-008",
+    "day": "Day 4",
+    "found": "2026-11-02",
+    "module": "Timetable",
+    "layer": "Frontend",
+    "severity": "Medium",
+    "title": "Subject picker showed \"No match\" for a class with no subjects chosen",
+    "steps": "Timetable builder, Class 12 - A, click a period, open Subject",
+    "expected": "School subjects to choose from, or a clear message saying where to add them",
+    "actual": "Empty list with \"No match\"; nothing could be placed",
+    "status": "Fixed",
+    "fix": "Picker lists the class plan first, then every other school subject marked \"Not in class plan\"; empty lists now say where to add subjects; plan panel links to School setup → Classes and sections",
+    "retest": "Pass (TT-06)"
+  },
+  {
+    "id": "BUG-009",
+    "day": "Day 4",
+    "found": "2026-11-02",
+    "module": "All modals",
+    "layer": "Frontend",
+    "severity": "Low",
+    "title": "Empty modal box flashed after Cancel",
+    "steps": "Students, Add student, Cancel",
+    "expected": "Modal fades out with its form",
+    "actual": "Form vanished first, leaving an empty box with only the title and buttons",
+    "status": "Fixed",
+    "fix": "AppModal keeps its last content until the close animation ends (Add student, staff, admission and profile modals)",
+    "retest": "Pass (closed cleanly in Chrome)"
   }
 ]

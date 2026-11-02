@@ -44,6 +44,9 @@ export function AppModal({
   size = 'md',
   footer,
 }: AppModalProps) {
+  const [lastOpenChildren, setLastOpenChildren] = React.useState(children)
+  if (open && lastOpenChildren !== children) setLastOpenChildren(children)
+
   useShortcut(
     'modal.submit',
     () => {
@@ -61,7 +64,7 @@ export function AppModal({
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        {children}
+        {open ? children : lastOpenChildren}
         {footer ??
           (formId && (
             <DialogFooter>

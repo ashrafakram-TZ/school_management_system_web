@@ -21,6 +21,7 @@ interface ComboboxProps {
   className?: string
   invalid?: boolean
   highlightSelected?: boolean
+  emptyText?: string
 }
 
 const VISIBLE_ROWS = 5
@@ -37,6 +38,7 @@ export function Combobox({
   className,
   invalid,
   highlightSelected = true,
+  emptyText = 'No options yet',
 }: ComboboxProps) {
   const listId = useId()
   const listRef = useRef<HTMLDivElement>(null)
@@ -151,7 +153,9 @@ export function Combobox({
           style={{ maxHeight: `calc(${VISIBLE_ROWS} * 2.25rem + 0.5rem)` }}
         >
           {items.length === 0 ? (
-            <p className='px-3 py-6 text-center text-sm text-muted-foreground'>No match</p>
+            <p className='px-3 py-6 text-center text-sm text-muted-foreground'>
+              {options.length === 0 ? emptyText : 'No match'}
+            </p>
           ) : (
             items.map((option, index) => {
               const isSelected = (value ?? '') === option.value

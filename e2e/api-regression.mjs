@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const API = process.env.E2E_API_URL ?? 'http://localhost:3000/api/v1'
-const DAY = process.env.E2E_DAY ?? 'Day 3'
+const DAY = process.env.E2E_DAY ?? 'Day 4'
 const ROOT = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
 const OUT = path.join(ROOT, 'results')
 fs.mkdirSync(OUT, { recursive: true })
@@ -91,7 +91,7 @@ const client = (token) => async (method, url, body) => {
 }
 
 async function check(meta, fn) {
-  const row = { ...meta, day: DAY, status: 'Pass', actual: '' }
+  const row = { day: DAY, ...meta, status: 'Pass', actual: '' }
   try {
     row.actual = (await fn()) ?? meta.expected
   } catch (error) {
@@ -852,6 +852,387 @@ await C(
     if (response.status !== 401 || body.error !== 'API_KEY_INVALID')
       throw new Error(`${response.status} ${body.error}`)
     return '401 API_KEY_INVALID'
+  }
+)
+
+const D4 = (id, module, method, endpoint, scenario, expected, fn) =>
+  check({ id, module, method, endpoint, scenario, expected, day: 'Day 4' }, fn)
+const istDate = (offset = 0) =>
+  new Date(Date.now() + 5.5 * 3600 * 1000 + offset * 86400 * 1000).toISOString().slice(0, 10)
+const today = istDate()
+const schoolDay = (offset) =>
+  new Date(`${istDate(offset)}T00:00:00Z`).getUTCDay() === 0 ? istDate(offset + 1) : istDate(offset)
+const month = today.slice(0, 7)
+const children = (await parent('GET', '/mobile/parent/children')).body?.data ?? []
+const child = children[0]
+const teacherClasses = (await teacher('GET', '/mobile/teacher/classes')).body?.data ?? []
+const teacherSection = teacherClasses[0]?.section_id
+let board = null
+let childSectionId = 0
+
+await D4(
+  'API-AT-01',
+  'Attendance',
+  'GET',
+  '/admin/attendance/board',
+  'Daily board for today',
+  '200 with every section and totals',
+  async () => {
+    const result = await admin('GET', `/admin/attendance/board?date=${today}`)
+    expectStatus(result, 200)
+    board = result.body.data
+    if (!board.sections.length) throw new Error('No sections on the board')
+    const name = child ? `${child.class_name} - ${child.section_name}` : ''
+    childSectionId = board.sections.find((item) => item.name === name)?.section_id ?? 0
+    return `200, ${board.sections_total} sections, ${board.sections_not_marked} not marked`
+  }
+)
+await D4(
+  'API-AT-02',
+  'Attendance',
+  'PUT',
+  '/admin/attendance/sections/:id',
+  'Save with nothing filled',
+  '400 VALIDATION_FAILED on date, items',
+  async () => expectFields(await admin('PUT', `/admin/attendance/sections/${childSectionId || 1}`, {}), ['date', 'items'])
+)
+await D4(
+  'API-AT-03',
+  'Attendance',
+  'PUT',
+  '/admin/attendance/sections/:id',
+  'Attendance for a future date',
+  '400 FUTURE_DATE',
+  async () =>
+    expectStatus(
+      await admin('PUT', `/admin/attendance/sections/${childSectionId || 1}`, {
+        date: istDate(3),
+        items: [{ student_id: child?.id ?? 1, status: 'present' }],
+      }),
+      400,
+      'FUTURE_DATE'
+    )
+)
+await D4(
+  'API-AT-04',
+  'Attendance',
+  'PUT',
+  '/admin/attendance/sections/:id',
+  'Mark today with the parent’s child absent',
+  '200 saved, child absent, parent gets STUDENT_ABSENT in the app',
+  async () => {
+    if (!child || !childSectionId) throw new Error('Demo parent has no child on the board')
+    if (!board.working_day) return `Skipped: ${today} is not a school day`
+    const roster = (await admin('GET', `/admin/attendance/sections/${childSectionId}?date=${today}`)).body.data
+    const items = roster.students.map((student) => ({
+      student_id: student.student_id,
+      status: student.student_id === child.id ? 'absent' : student.on_leave ? 'leave' : 'present',
+    }))
+    const saved = await admin('PUT', `/admin/attendance/sections/${childSectionId}`, { date: today, items })
+    expectStatus(saved, 200)
+    const mark = saved.body.data.students.find((student) => student.student_id === child.id)
+    if (mark?.status !== 'absent') throw new Error(`Child saved as ${mark?.status}`)
+    const inbox = (await parent('GET', '/me/notifications?limit=50')).body?.data?.items ?? []
+    const alert = inbox.find(
+      (item) => item.template_code === 'STUDENT_ABSENT' && String(item.created_at ?? '').slice(0, 10) === today
+    )
+    if (!alert) throw new Error('No STUDENT_ABSENT notification for the parent today')
+    return `200, absent alert reached the parent: "${alert.title}"`
+  }
+)
+await D4(
+  'API-AT-05',
+  'Attendance',
+  'GET',
+  '/mobile/parent/children/:id/attendance',
+  'Parent month calendar and today badge',
+  '200 with days and %, today absent',
+  async () => {
+    if (!child) throw new Error('Demo parent has no child')
+    const result = await parent('GET', `/mobile/parent/children/${child.id}/attendance?month=${month}`)
+    expectStatus(result, 200)
+    const todayBadge = (await parent('GET', `/mobile/parent/children/${child.id}/attendance/today`)).body.data
+    if (board?.working_day && todayBadge.status !== 'absent') throw new Error(`Today shows ${todayBadge.status}`)
+    return `200, ${result.body.data.days?.length ?? 0} days, today ${todayBadge.status}`
+  }
+)
+await D4(
+  'API-AT-06',
+  'Attendance',
+  'GET',
+  '/mobile/teacher/sections/:id/attendance',
+  'Teacher opens the roster of a section they do not teach',
+  '403 or 404, never the roster',
+  async () => {
+    const other = board?.sections.find((item) => !teacherClasses.some((row) => row.section_id === item.section_id))
+    if (!other) return 'Skipped: teacher teaches every section'
+    const result = await teacher('GET', `/mobile/teacher/sections/${other.section_id}/attendance?date=${today}`)
+    if (![403, 404].includes(result.status)) throw new Error(`Got ${result.status}`)
+    return `${result.status} ${result.body?.error}`
+  }
+)
+await D4(
+  'API-AT-07',
+  'Attendance',
+  'GET',
+  '/mobile/teacher/sections/:id/attendance',
+  'Teacher opens their own section',
+  '200 roster in roll order',
+  async () => {
+    if (!teacherSection) throw new Error('Demo teacher has no section')
+    const result = await teacher('GET', `/mobile/teacher/sections/${teacherSection}/attendance?date=${today}`)
+    expectStatus(result, 200)
+    return `200, ${result.body.data.students.length} students`
+  }
+)
+await D4(
+  'API-SA-01',
+  'Staff attendance',
+  'POST',
+  '/mobile/teacher/check-in',
+  'Check in with no location',
+  '400 VALIDATION_FAILED on lat, lng',
+  async () => expectFields(await teacher('POST', '/mobile/teacher/check-in', {}), ['lat', 'lng'])
+)
+await D4(
+  'API-SA-02',
+  'Staff attendance',
+  'POST',
+  '/mobile/teacher/check-in',
+  'Check in far from school (Bengaluru)',
+  '400 OUTSIDE_SCHOOL',
+  async () => {
+    const result = await teacher('POST', '/mobile/teacher/check-in', { lat: 12.9716, lng: 77.5946, accuracy_m: 10 })
+    if (result.body?.error === 'ALREADY_CHECKED_IN') return '409 ALREADY_CHECKED_IN (checked in earlier today)'
+    return expectStatus(result, 400, 'OUTSIDE_SCHOOL')
+  }
+)
+await D4(
+  'API-SA-03',
+  'Staff attendance',
+  'GET',
+  '/admin/staff-attendance/board',
+  'Staff board for today',
+  '200 with present, late, on leave and not checked in',
+  async () => {
+    const result = await admin('GET', `/admin/staff-attendance/board?date=${today}`)
+    expectStatus(result, 200)
+    const data = result.body.data
+    if (!data.staff.length) throw new Error('No staff on the board')
+    return `200, ${data.total} staff: ${data.present} present, ${data.late} late, ${data.on_leave} on leave, ${data.not_checked_in} not in`
+  }
+)
+await D4(
+  'API-SA-04',
+  'Staff attendance',
+  'POST',
+  '/integrations/biometric/punches',
+  'Biometric punch without the device key',
+  '401 DEVICE_KEY_INVALID, or 503 BIOMETRIC_OFF when no key is set',
+  async () => {
+    const result = await guest('POST', '/integrations/biometric/punches', {
+      school_code: 'TZMS',
+      punches: [{ employee_no: 'TZMS-EMP-0004', punched_at: `${today}T08:30:00+05:30` }],
+    })
+    if (![401, 503].includes(result.status)) throw new Error(`Got ${result.status}`)
+    return `${result.status} ${result.body?.error}`
+  }
+)
+let leaveTypeId = 0
+await D4(
+  'API-LV-01',
+  'Staff leave',
+  'GET',
+  '/mobile/teacher/leave-balances',
+  'Teacher leave balances',
+  '200 with CL, SL, EL, LOP',
+  async () => {
+    const result = await teacher('GET', '/mobile/teacher/leave-balances')
+    expectStatus(result, 200)
+    const casual = result.body.data.find((item) => (item.leave_type?.code ?? item.code) === 'CL')
+    leaveTypeId = casual?.leave_type?.id ?? casual?.leave_type_id ?? casual?.id ?? 0
+    return `200, ${result.body.data.length} leave types`
+  }
+)
+await D4(
+  'API-LV-02',
+  'Staff leave',
+  'POST',
+  '/mobile/teacher/leaves',
+  'Apply with nothing filled',
+  '400 VALIDATION_FAILED on leave_type_id, from_date, to_date, reason',
+  async () =>
+    expectFields(await teacher('POST', '/mobile/teacher/leaves', {}), ['leave_type_id', 'from_date', 'to_date', 'reason'])
+)
+await D4(
+  'API-LV-03',
+  'Staff leave',
+  'POST',
+  '/mobile/teacher/leaves',
+  'Apply for one day of casual leave, then cancel it',
+  '201 waiting for approval, then 200 cancelled',
+  async () => {
+    const date = schoolDay(20)
+    const applied = await teacher('POST', '/mobile/teacher/leaves', {
+      leave_type_id: leaveTypeId,
+      from_date: date,
+      to_date: date,
+      reason: 'Regression test leave',
+    })
+    expectStatus(applied, 201)
+    const cancelled = await teacher('POST', `/mobile/teacher/leaves/${applied.body.data.id}/cancel`)
+    expectStatus(cancelled, 200)
+    return `201 ${applied.body.data.status}, then ${cancelled.body.data.status}`
+  }
+)
+await D4(
+  'API-LV-04',
+  'Student leave',
+  'POST',
+  '/mobile/parent/children/:id/leaves',
+  'Parent applies with the last day before the first',
+  '400 VALIDATION_FAILED on to_date',
+  async () =>
+    expectFields(
+      await parent('POST', `/mobile/parent/children/${child?.id ?? 1}/leaves`, {
+        from_date: istDate(10),
+        to_date: istDate(9),
+        reason: 'Regression test',
+      }),
+      ['to_date']
+    )
+)
+await D4(
+  'API-LV-05',
+  'Student leave',
+  'POST',
+  '/mobile/parent/children/:id/leaves',
+  'Parent applies for leave, then cancels',
+  '201 pending, then 200 cancelled',
+  async () => {
+    const applied = await parent('POST', `/mobile/parent/children/${child.id}/leaves`, {
+      from_date: schoolDay(25),
+      to_date: schoolDay(25),
+      reason: 'Regression test leave',
+    })
+    expectStatus(applied, 201)
+    const cancelled = await parent('POST', `/mobile/parent/children/${child.id}/leaves/${applied.body.data.id}/cancel`)
+    expectStatus(cancelled, 200)
+    return `201 ${applied.body.data.status}, then ${cancelled.body.data.status}`
+  }
+)
+let grid = null
+await D4(
+  'API-TT-01',
+  'Timetable',
+  'GET',
+  '/admin/timetable/periods',
+  'Bell schedule',
+  '200 with 8 teaching periods and 2 breaks',
+  async () => {
+    const result = await admin('GET', '/admin/timetable/periods')
+    expectStatus(result, 200)
+    const teaching = result.body.data.filter((item) => !item.is_break).length
+    return `200, ${teaching} periods, ${result.body.data.length - teaching} breaks`
+  }
+)
+await D4(
+  'API-TT-02',
+  'Timetable',
+  'PUT',
+  '/admin/timetable/periods',
+  'Bell schedule with overlapping periods',
+  '400 BELL_INVALID',
+  async () =>
+    expectStatus(
+      await admin('PUT', '/admin/timetable/periods', {
+        items: [
+          { name: 'Period 1', start_time: '09:00', end_time: '09:45' },
+          { name: 'Period 2', start_time: '09:30', end_time: '10:15' },
+        ],
+      }),
+      400,
+      'BELL_INVALID'
+    )
+)
+await D4(
+  'API-TT-03',
+  'Timetable',
+  'GET',
+  '/admin/timetable/sections/:id',
+  'Section timetable of 6 - A',
+  '200 with slots and subject plan',
+  async () => {
+    const six = board?.sections.find((item) => item.name === '6 - A')
+    if (!six) throw new Error('6 - A not on the board')
+    const result = await admin('GET', `/admin/timetable/sections/${six.section_id}`)
+    expectStatus(result, 200)
+    grid = result.body.data
+    return `200, ${grid.slots.length} periods placed, ${grid.plan.length} subjects`
+  }
+)
+await D4(
+  'API-TT-04',
+  'Timetable',
+  'PUT',
+  '/admin/timetable/sections/:id/slots',
+  'Same teacher in another section in the same period',
+  '409 TEACHER_CLASH',
+  async () => {
+    const busy = grid?.slots.find((slot) => slot.teacher)
+    const other = board?.sections.find((item) => item.section_id !== grid?.section.id)
+    if (!busy || !other) throw new Error('No seeded slot to clash with')
+    return expectStatus(
+      await admin('PUT', `/admin/timetable/sections/${other.section_id}/slots`, {
+        day_of_week: busy.day_of_week,
+        period_no: busy.period_no,
+        subject_id: busy.subject.id,
+        teacher_user_id: busy.teacher.id,
+        room: null,
+      }),
+      409,
+      'TEACHER_CLASH'
+    )
+  }
+)
+await D4(
+  'API-TT-05',
+  'Timetable',
+  'PUT',
+  '/admin/timetable/sections/:id/slots',
+  'Put a subject with no day or period',
+  '400 VALIDATION_FAILED on day_of_week, period_no, subject_id',
+  async () =>
+    expectFields(await admin('PUT', `/admin/timetable/sections/${grid?.section.id ?? 1}/slots`, {}), [
+      'day_of_week',
+      'period_no',
+      'subject_id',
+    ])
+)
+await D4(
+  'API-TT-06',
+  'Timetable',
+  'GET',
+  '/admin/timetable/workload',
+  'Teacher workload report',
+  '200 with periods per teacher',
+  async () => {
+    const result = await admin('GET', '/admin/timetable/workload')
+    expectStatus(result, 200)
+    return `200, ${result.body.data.teachers.length} teachers, ${result.body.data.unscheduled} periods still to place`
+  }
+)
+await D4(
+  'API-TT-07',
+  'Timetable',
+  'GET',
+  '/mobile/teacher/timetable',
+  'Teacher’s own week in the Staff app',
+  '200 with my periods',
+  async () => {
+    const result = await teacher('GET', '/mobile/teacher/timetable')
+    expectStatus(result, 200)
+    return `200, ${result.body.data.periods_per_week} periods a week`
   }
 )
 
