@@ -1,10 +1,23 @@
 import { useState } from 'react'
-import { Bus, CircleOff, MapPin, Navigation, PauseCircle, WifiOff } from 'lucide-react'
+import {
+  AlertTriangle,
+  BatteryMedium,
+  Bus,
+  CircleOff,
+  Fuel,
+  Gauge,
+  KeyRound,
+  MapPin,
+  Navigation,
+  PauseCircle,
+  Timer,
+} from 'lucide-react'
 import { DataTable, type Column } from '@/components/common/data-table'
 import { EmptyState, ErrorState } from '@/components/common/display'
 import { FleetMap } from '@/components/common/fleet-map'
 import { InsightCards, type Insight } from '@/components/common/insight-cards'
 import { Page, PageHeader } from '@/components/common/page'
+import { SegmentedControl } from '@/components/common/segmented-control'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import {
@@ -18,14 +31,33 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { useNow } from '@/hooks/use-now'
 import { formatDateTime, formatNumber, timeAgo } from '@/lib/format'
-import { usePositions, useFleetLive, VEHICLE_STATE, type Vehicle, type VehicleState } from '../api'
+import { cn } from '@/lib/utils'
+import {
+  ALERT_LABELS,
+  EVENT_LABELS,
+  harshTotal,
+  useFleetLive,
+  usePositions,
+  VEHICLE_STATE,
+  type Vehicle,
+  type VehicleState,
+} from '../api'
 
-type Filter = 'all' | 'moving' | 'idle' | 'offline'
+type Filter = 'all' | 'moving' | 'idle' | 'parked' | 'offline' | 'attention'
 
-const matches = (vehicle: Vehicle, filter: Filter) =>
-  filter === 'all' ||
-  vehicle.state === filter ||
-  (filter === 'offline' && (vehicle.state === 'offline' || vehicle.state === 'no_data'))
+const matches = (vehicle: Vehicle, filter: Filter) => {
+  if (filter === 'all') return true
+  if (filter === 'attention') return vehicle.alerts.length > 0
+  if (filter === 'offline') return vehicle.state === 'offline' || vehicle.state === 'no_data'
+  return vehicle.state === filter
+}
+
+const duration = (since: string | null, now: number) => {
+  if (!since) return null
+  const minutes = Math.max(0, Math.round((now - new Date(since).getTime()) / 60000))
+  if (minutes < 60) return `${minutes} min`
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`
+}
 
 export function FleetPage() {
   const live = useFleetLive()
@@ -33,8 +65,10 @@ export function FleetPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const [openId, setOpenId] = useState<number | null>(null)
   const data = live.data
-  const vehicles = (data?.vehicles ?? []).filter((vehicle) => matches(vehicle, filter))
-  const open = data?.vehicles.find((vehicle) => vehicle.id === openId) ?? null
+  const all = data?.vehicles ?? []
+  const vehicles = all.filter((vehicle) => matches(vehicle, filter))
+  const open = all.find((vehicle) => vehicle.id === openId) ?? null
+  const attention = all.filter((vehicle) => vehicle.alerts.length > 0).length
   const toggle = (next: Filter) => setFilter((current) => (current === next ? 'all' : next))
 
   const cards: Insight[] = [
@@ -42,7 +76,7 @@ export function FleetPage() {
       key: 'all',
       label: 'Buses',
       value: data?.total ?? 0,
-      hint: 'With a tracker',
+      hint: `${data?.parked ?? 0} parked · ${data?.offline ?? 0} offline`,
       icon: Bus,
       tone: 'primary',
       active: filter === 'all',
@@ -60,23 +94,23 @@ export function FleetPage() {
     },
     {
       key: 'idle',
-      label: 'Stopped',
+      label: 'Idle, engine on',
       value: data?.idle ?? 0,
-      hint: 'Engine on or parked',
+      hint: 'Stopped but burning fuel',
       icon: PauseCircle,
       tone: 'warning',
       active: filter === 'idle',
       onClick: () => toggle('idle'),
     },
     {
-      key: 'offline',
-      label: 'Offline',
-      value: data?.offline ?? 0,
-      hint: 'No signal in the last 2 minutes',
-      icon: WifiOff,
-      tone: 'neutral',
-      active: filter === 'offline',
-      onClick: () => toggle('offline'),
+      key: 'attention',
+      label: 'Need attention',
+      value: attention,
+      hint: `${data?.harsh_events_today ?? 0} harsh events today · ${data?.low_fuel ?? 0} low fuel`,
+      icon: AlertTriangle,
+      tone: attention ? 'danger' : 'neutral',
+      active: filter === 'attention',
+      onClick: () => toggle('attention'),
     },
   ]
 
@@ -93,36 +127,66 @@ export function FleetPage() {
         </div>
       ),
     },
-    { key: 'state', header: 'Status', cell: (vehicle) => <StateBadge state={vehicle.state} /> },
+    {
+      key: 'state',
+      header: 'Status',
+      cell: (vehicle) => (
+        <div className='grid justify-items-start gap-1'>
+          <StateBadge state={vehicle.state} />
+          {vehicle.stopped_since && vehicle.online && (
+            <span className='text-xs text-muted-foreground'>
+              for {duration(vehicle.stopped_since, now)}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'ignition',
+      header: 'Ignition',
+      cell: (vehicle) => <Ignition value={vehicle.position?.ignition ?? null} />,
+    },
     {
       key: 'speed',
       header: 'Speed',
+      hideBelow: 'lg',
       cell: (vehicle) => (
-        <span className='tabular'>{formatNumber(vehicle.position?.speed, 0, ' km/h')}</span>
+        <span className='tabular font-semibold'>
+          {formatNumber(vehicle.position?.speed, 0, ' km/h')}
+        </span>
       ),
+    },
+    {
+      key: 'fuel',
+      header: 'Fuel',
+      cell: (vehicle) => <Level value={vehicle.fuel} low={15} />,
+    },
+    {
+      key: 'battery',
+      header: 'Battery',
+      cell: (vehicle) => (
+        <Level
+          value={vehicle.battery}
+          low={20}
+          suffix={vehicle.battery_voltage ? `${vehicle.battery_voltage.toFixed(1)} V` : undefined}
+        />
+      ),
+    },
+    {
+      key: 'harsh',
+      header: 'Harsh today',
+      hideBelow: 'lg',
+      cell: (vehicle) => <Harsh vehicle={vehicle} />,
     },
     {
       key: 'seen',
       header: 'Last signal',
-      hideBelow: 'lg',
+      hideBelow: 'xl',
       cell: (vehicle) => (
         <span className='text-muted-foreground'>
           {vehicle.last_seen_at ? timeAgo(vehicle.last_seen_at, now) : 'Never'}
         </span>
       ),
-    },
-    {
-      key: 'where',
-      header: 'Location',
-      hideBelow: 'xl',
-      cell: (vehicle) =>
-        vehicle.position ? (
-          <span className='tabular text-xs text-muted-foreground'>
-            {vehicle.position.lat.toFixed(5)}, {vehicle.position.lng.toFixed(5)}
-          </span>
-        ) : (
-          '—'
-        ),
     },
   ]
 
@@ -131,7 +195,7 @@ export function FleetPage() {
       <PageHeader
         eyebrow='Fleet'
         title='Bus tracking'
-        description='Where every bus is right now and whether it is moving. Updates every few seconds.'
+        description='Where every bus is, whether the engine is on, fuel, battery and harsh driving. Updates every few seconds.'
       />
       {live.isError && !data ? (
         <Card className='p-6'>
@@ -140,45 +204,64 @@ export function FleetPage() {
       ) : (
         <>
           <InsightCards items={cards} loading={live.isPending} />
-          <div className='grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]'>
-            <Card className='overflow-hidden'>
-              {live.isPending ? (
-                <Skeleton className='h-[420px] rounded-none' />
-              ) : (
-                <FleetMap
-                  className='h-[420px]'
-                  emptyText='No bus has sent its position yet'
-                  onSelect={setOpenId}
-                  points={vehicles
-                    .filter((vehicle) => vehicle.position)
-                    .map((vehicle) => ({
-                      id: vehicle.id,
-                      lat: vehicle.position!.lat,
-                      lng: vehicle.position!.lng,
-                      label: vehicle.name,
-                      sublabel: `${VEHICLE_STATE[vehicle.state].label} · ${formatNumber(vehicle.position!.speed, 0, ' km/h')}`,
-                      color: VEHICLE_STATE[vehicle.state].color,
-                    }))}
-                />
-              )}
-            </Card>
-            <Card className='overflow-hidden'>
-              <DataTable
-                rows={vehicles}
-                columns={columns}
-                rowKey={(vehicle) => vehicle.id}
-                loading={live.isPending}
-                error={null}
-                onRowClick={(vehicle) => setOpenId(vehicle.id)}
-                empty={{
-                  icon: filter === 'all' ? Bus : CircleOff,
-                  title: filter === 'all' ? 'No buses yet' : 'No bus in this state',
-                  description:
-                    filter === 'all'
-                      ? 'Trackers are registered in the Telematics service. They appear here once added.'
-                      : 'Click the card again to see every bus.',
-                }}
-                card={(vehicle) => (
+          <Card className='overflow-hidden'>
+            {live.isPending ? (
+              <Skeleton className='h-[360px] rounded-none' />
+            ) : (
+              <FleetMap
+                className='h-[300px] sm:h-[360px]'
+                emptyText='No bus has sent its position yet'
+                onSelect={setOpenId}
+                points={vehicles
+                  .filter((vehicle) => vehicle.position)
+                  .map((vehicle) => ({
+                    id: vehicle.id,
+                    lat: vehicle.position!.lat,
+                    lng: vehicle.position!.lng,
+                    label: vehicle.name,
+                    sublabel: `${VEHICLE_STATE[vehicle.state].label} · ${formatNumber(vehicle.position!.speed, 0, ' km/h')}`,
+                    color: VEHICLE_STATE[vehicle.state].color,
+                  }))}
+              />
+            )}
+          </Card>
+          <Card className='overflow-hidden'>
+            <div className='flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3'>
+              <SegmentedControl
+                label='Show buses'
+                value={filter}
+                onChange={setFilter}
+                className='max-w-full overflow-x-auto'
+                options={[
+                  { value: 'all', label: 'All' },
+                  { value: 'moving', label: 'Moving' },
+                  { value: 'idle', label: 'Idle' },
+                  { value: 'parked', label: 'Parked' },
+                  { value: 'offline', label: 'Offline' },
+                  { value: 'attention', label: 'Attention' },
+                ]}
+              />
+              <span className='text-sm text-muted-foreground'>
+                {vehicles.length} of {all.length} buses
+              </span>
+            </div>
+            <DataTable
+              rows={vehicles}
+              columns={columns}
+              rowKey={(vehicle) => vehicle.id}
+              loading={live.isPending}
+              error={null}
+              onRowClick={(vehicle) => setOpenId(vehicle.id)}
+              empty={{
+                icon: filter === 'all' ? Bus : CircleOff,
+                title: filter === 'all' ? 'No buses yet' : 'No bus here right now',
+                description:
+                  filter === 'all'
+                    ? 'Trackers are registered in the Telematics console. They appear here once added.'
+                    : 'Choose All to see every bus.',
+              }}
+              card={(vehicle) => (
+                <div className='grid gap-2'>
                   <div className='flex items-center justify-between gap-3'>
                     <div className='grid'>
                       <span className='font-bold'>{vehicle.name}</span>
@@ -191,13 +274,19 @@ export function FleetPage() {
                     </div>
                     <StateBadge state={vehicle.state} />
                   </div>
-                )}
-              />
-            </Card>
-          </div>
+                  <div className='grid grid-cols-3 gap-2 text-xs'>
+                    <Ignition value={vehicle.position?.ignition ?? null} />
+                    <Level value={vehicle.fuel} low={15} />
+                    <Level value={vehicle.battery} low={20} />
+                  </div>
+                  {vehicle.alerts.length > 0 && <Alerts vehicle={vehicle} />}
+                </div>
+              )}
+            />
+          </Card>
         </>
       )}
-      <VehicleSheet vehicle={open} onClose={() => setOpenId(null)} />
+      <VehicleSheet vehicle={open} now={now} onClose={() => setOpenId(null)} />
     </Page>
   )
 }
@@ -210,7 +299,98 @@ function StateBadge({ state }: { state: VehicleState }) {
   )
 }
 
-function VehicleSheet({ vehicle, onClose }: { vehicle: Vehicle | null; onClose: () => void }) {
+function Ignition({ value }: { value: boolean | null }) {
+  if (value === null) return <span className='text-muted-foreground'>—</span>
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 font-semibold',
+        value ? 'text-success' : 'text-muted-foreground'
+      )}
+    >
+      <KeyRound className='size-3.5' />
+      {value ? 'On' : 'Off'}
+    </span>
+  )
+}
+
+function Level({ value, low, suffix }: { value: number | null; low: number; suffix?: string }) {
+  if (value === null) return <span className='text-muted-foreground'>—</span>
+  const tone = value < low ? 'bg-destructive' : value < low * 2 ? 'bg-warning' : 'bg-success'
+  return (
+    <div className='grid min-w-20 gap-1'>
+      <span className={cn('tabular text-sm font-semibold', value < low && 'text-destructive')}>
+        {Math.round(value)}%
+        {suffix && <span className='ml-1 text-xs font-normal text-muted-foreground'>{suffix}</span>}
+      </span>
+      <span className='h-1.5 overflow-hidden rounded-full bg-muted'>
+        <span
+          className={cn('block h-full rounded-full', tone)}
+          style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+        />
+      </span>
+    </div>
+  )
+}
+
+function Harsh({ vehicle }: { vehicle: Vehicle }) {
+  if (!harshTotal(vehicle)) return <span className='text-muted-foreground'>None</span>
+  return (
+    <span className='flex flex-wrap gap-1'>
+      {vehicle.harsh_today.brake > 0 && (
+        <Badge tone='danger'>{vehicle.harsh_today.brake} braking</Badge>
+      )}
+      {vehicle.harsh_today.accel > 0 && (
+        <Badge tone='warning'>{vehicle.harsh_today.accel} speeding up</Badge>
+      )}
+      {vehicle.harsh_today.turn > 0 && (
+        <Badge tone='warning'>{vehicle.harsh_today.turn} turns</Badge>
+      )}
+    </span>
+  )
+}
+
+function Alerts({ vehicle }: { vehicle: Vehicle }) {
+  return (
+    <span className='flex flex-wrap gap-1'>
+      {vehicle.alerts.map((alert) => (
+        <Badge key={alert} tone={alert === 'harsh_driving' ? 'warning' : 'danger'}>
+          {ALERT_LABELS[alert]}
+        </Badge>
+      ))}
+    </span>
+  )
+}
+
+function Tile({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: typeof Fuel
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className='grid content-start gap-1.5 rounded-lg border p-3'>
+      <span className='flex items-center gap-1.5 text-[11px] font-bold tracking-wider text-muted-foreground uppercase'>
+        <Icon className='size-3.5' />
+        {label}
+      </span>
+      <div className='text-sm font-semibold'>{children}</div>
+    </div>
+  )
+}
+
+function VehicleSheet({
+  vehicle,
+  now,
+  onClose,
+}: {
+  vehicle: Vehicle | null
+  now: number
+  onClose: () => void
+}) {
   const positions = usePositions(vehicle?.id ?? null)
   return (
     <Sheet open={Boolean(vehicle)} onOpenChange={(open) => !open && onClose()}>
@@ -225,30 +405,38 @@ function VehicleSheet({ vehicle, onClose }: { vehicle: Vehicle | null; onClose: 
               </SheetDescription>
             </SheetHeader>
             <SheetBody className='grid content-start gap-5'>
-              {vehicle.position ? (
-                <dl className='grid grid-cols-2 gap-3 rounded-lg border p-3'>
-                  {[
-                    ['Speed', formatNumber(vehicle.position.speed, 0, ' km/h')],
-                    [
-                      'Ignition',
-                      vehicle.position.ignition === null
-                        ? '—'
-                        : vehicle.position.ignition
-                          ? 'On'
-                          : 'Off',
-                    ],
-                    ['Fuel', formatNumber(vehicle.position.fuel, 0, '%')],
-                    ['Last signal', formatDateTime(vehicle.position.recorded_at)],
-                  ].map(([label, value]) => (
-                    <div key={label} className='grid gap-0.5'>
-                      <dt className='text-[11px] font-bold tracking-wider text-muted-foreground uppercase'>
-                        {label}
-                      </dt>
-                      <dd className='text-sm font-semibold'>{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : (
+              {vehicle.alerts.length > 0 && <Alerts vehicle={vehicle} />}
+              <div className='grid grid-cols-2 gap-2'>
+                <Tile icon={KeyRound} label='Ignition'>
+                  <Ignition value={vehicle.position?.ignition ?? null} />
+                </Tile>
+                <Tile icon={Gauge} label='Speed'>
+                  {formatNumber(vehicle.position?.speed, 0, ' km/h')}
+                </Tile>
+                <Tile icon={Fuel} label='Fuel'>
+                  <Level value={vehicle.fuel} low={15} />
+                </Tile>
+                <Tile icon={BatteryMedium} label='Battery'>
+                  <Level
+                    value={vehicle.battery}
+                    low={20}
+                    suffix={
+                      vehicle.battery_voltage
+                        ? `${vehicle.battery_voltage.toFixed(1)} V`
+                        : undefined
+                    }
+                  />
+                </Tile>
+                <Tile icon={Timer} label={vehicle.state === 'parked' ? 'Parked for' : 'Idle for'}>
+                  {vehicle.stopped_since && vehicle.online
+                    ? duration(vehicle.stopped_since, now)
+                    : '—'}
+                </Tile>
+                <Tile icon={AlertTriangle} label='Harsh today'>
+                  <Harsh vehicle={vehicle} />
+                </Tile>
+              </div>
+              {!vehicle.position && (
                 <EmptyState
                   icon={MapPin}
                   title='No position yet'
@@ -257,7 +445,7 @@ function VehicleSheet({ vehicle, onClose }: { vehicle: Vehicle | null; onClose: 
               )}
               <section className='grid gap-2'>
                 <h3 className='text-xs font-bold tracking-wider text-muted-foreground uppercase'>
-                  Recent positions
+                  Recent readings
                 </h3>
                 {positions.isError ? (
                   <ErrorState
@@ -273,13 +461,16 @@ function VehicleSheet({ vehicle, onClose }: { vehicle: Vehicle | null; onClose: 
                     {positions.data.items.map((row) => (
                       <li
                         key={row.id}
-                        className='flex items-center justify-between gap-3 border-b px-3 py-2 text-sm last:border-0'
+                        className='flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2 text-sm last:border-0'
                       >
                         <span className='tabular text-muted-foreground'>
                           {formatDateTime(row.recorded_at)}
                         </span>
-                        <span className='tabular font-semibold'>
-                          {formatNumber(row.speed, 0, ' km/h')}
+                        <span className='flex items-center gap-2'>
+                          {row.event && <Badge tone='danger'>{EVENT_LABELS[row.event]}</Badge>}
+                          <span className='tabular font-semibold'>
+                            {formatNumber(row.speed, 0, ' km/h')}
+                          </span>
                         </span>
                       </li>
                     ))}

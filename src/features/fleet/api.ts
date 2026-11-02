@@ -3,7 +3,9 @@ import type { BadgeTone } from '@/components/ui/badge'
 import { config } from '@/config/env'
 import { api, type Paginated } from '@/lib/api/client'
 
-export type VehicleState = 'moving' | 'idle' | 'offline' | 'no_data'
+export type VehicleState = 'moving' | 'idle' | 'parked' | 'offline' | 'no_data'
+export type VehicleAlert = 'low_fuel' | 'low_battery' | 'harsh_driving'
+export type DrivingEvent = 'harsh_brake' | 'harsh_accel' | 'harsh_turn'
 
 export interface Position {
   lat: number
@@ -11,7 +13,6 @@ export interface Position {
   speed: number | null
   heading: number | null
   ignition: boolean | null
-  fuel: number | null
   recorded_at: string
 }
 
@@ -23,6 +24,12 @@ export interface Vehicle {
   state: VehicleState
   online: boolean
   last_seen_at: string | null
+  fuel: number | null
+  battery: number | null
+  battery_voltage: number | null
+  stopped_since: string | null
+  harsh_today: { brake: number; accel: number; turn: number }
+  alerts: VehicleAlert[]
   position: Position | null
 }
 
@@ -30,12 +37,18 @@ export interface FleetLive {
   total: number
   moving: number
   idle: number
+  parked: number
   offline: number
+  harsh_events_today: number
+  low_fuel: number
   vehicles: Vehicle[]
 }
 
 export interface PositionRow extends Position {
   id: string
+  fuel: number | null
+  battery: number | null
+  event: DrivingEvent | null
 }
 
 export const VEHICLE_STATE: Record<
@@ -43,10 +56,26 @@ export const VEHICLE_STATE: Record<
   { label: string; tone: BadgeTone; color: string }
 > = {
   moving: { label: 'Moving', tone: 'success', color: '#159053' },
-  idle: { label: 'Stopped', tone: 'warning', color: '#c27a00' },
+  idle: { label: 'Idle, engine on', tone: 'warning', color: '#c27a00' },
+  parked: { label: 'Parked, engine off', tone: 'info', color: '#2563eb' },
   offline: { label: 'Offline', tone: 'neutral', color: '#7f938a' },
   no_data: { label: 'No signal yet', tone: 'neutral', color: '#7f938a' },
 }
+
+export const ALERT_LABELS: Record<VehicleAlert, string> = {
+  low_fuel: 'Low fuel',
+  low_battery: 'Low battery',
+  harsh_driving: 'Harsh driving',
+}
+
+export const EVENT_LABELS: Record<DrivingEvent, string> = {
+  harsh_brake: 'Harsh braking',
+  harsh_accel: 'Harsh acceleration',
+  harsh_turn: 'Harsh turn',
+}
+
+export const harshTotal = (vehicle: Vehicle) =>
+  vehicle.harsh_today.brake + vehicle.harsh_today.accel + vehicle.harsh_today.turn
 
 export const fleetKeys = {
   all: ['fleet'] as const,
