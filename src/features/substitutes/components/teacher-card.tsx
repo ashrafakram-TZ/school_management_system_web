@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import type { AbsentPeriod, AbsentTeacher } from '../api'
-import { periodTime, reasonTone } from '../labels'
+import { combinedText, periodTime, reasonTone } from '../labels'
 
 export function TeacherCard({
   item,
@@ -19,7 +19,7 @@ export function TeacherCard({
   onAssign: (period: AbsentPeriod) => void
   onRemove: (period: AbsentPeriod) => void
 }) {
-  const covered = item.periods.filter((period) => period.substitute).length
+  const covered = item.periods.filter((period) => period.substitution_id).length
   const total = item.periods.length
 
   return (
@@ -66,15 +66,26 @@ export function TeacherCard({
                 </div>
               </div>
               <div className='flex w-full min-w-0 items-center justify-between gap-2 sm:w-auto sm:justify-end'>
-                {period.substitute ? (
+                {period.substitution_id ? (
                   <>
                     <span className='grid min-w-0 sm:text-right'>
                       <span className='text-[11px] font-bold tracking-wider text-muted-foreground uppercase'>
-                        Proxy
+                        {period.kind === 'combine' ? 'Combined class' : 'Proxy'}
                       </span>
-                      <span className='truncate font-semibold text-success'>
-                        {period.substitute.name}
-                      </span>
+                      {period.kind === 'combine' ? (
+                        period.combined_into.map((merge) => (
+                          <span
+                            key={`${merge.group}-${merge.section.id}`}
+                            className='truncate text-sm font-semibold text-success'
+                          >
+                            {combinedText(merge)}
+                          </span>
+                        ))
+                      ) : (
+                        <span className='truncate font-semibold text-success'>
+                          {period.substitute?.name}
+                        </span>
+                      )}
                       {period.note && (
                         <span className='truncate text-xs text-muted-foreground'>
                           {period.note}
@@ -86,7 +97,7 @@ export function TeacherCard({
                         variant='ghost'
                         size='sm'
                         className='text-destructive hover:bg-destructive/10'
-                        aria-label={`Remove ${period.substitute.name} from period ${period.period_no}`}
+                        aria-label={`Remove ${period.kind === 'combine' ? 'the combined class' : period.substitute?.name} from period ${period.period_no}`}
                         loading={removingId === period.substitution_id}
                         onClick={() => onRemove(period)}
                       >
@@ -101,7 +112,7 @@ export function TeacherCard({
                     {editable && (
                       <Button
                         size='sm'
-                        aria-label={`Assign a proxy for period ${period.period_no}`}
+                        aria-label={`Assign a proxy or combine the class for period ${period.period_no}`}
                         onClick={() => onAssign(period)}
                       >
                         <UserRoundPlus />

@@ -10,6 +10,17 @@ export interface SubjectRef extends Ref {
   code: string
 }
 
+export type CoverKind = 'proxy' | 'combine'
+export type MergeGroup = 'all' | 'boys' | 'girls'
+export type CombineMode = 'whole' | 'split'
+
+export interface CombinedInto {
+  section: Ref
+  group: MergeGroup
+  students: number
+  teacher: Ref | null
+}
+
 export interface AbsentPeriod {
   slot_id: number
   period_no: number
@@ -19,7 +30,9 @@ export interface AbsentPeriod {
   subject: SubjectRef
   room: string | null
   substitution_id: number | null
+  kind: CoverKind | null
   substitute: Ref | null
+  combined_into: CombinedInto[]
   note: string | null
 }
 
@@ -62,6 +75,32 @@ export interface AssignInput {
   note?: string | null
 }
 
+export interface CombineTarget {
+  slot_id: number
+  section: Ref
+  subject: SubjectRef
+  teacher: Ref
+  room: string | null
+  students: number
+  joining: number
+}
+
+export interface CombineOptions {
+  period: AbsentPeriod
+  students: { total: number; boys: number; girls: number }
+  targets: CombineTarget[]
+}
+
+export interface CombineInput {
+  date: string
+  slot_id: number
+  mode: CombineMode
+  section_id?: number
+  boys_section_id?: number
+  girls_section_id?: number
+  note?: string | null
+}
+
 export interface AutoAssignResult {
   assigned: number
   left_uncovered: number
@@ -72,6 +111,8 @@ export const substituteKeys = {
   all: ['substitutes'] as const,
   board: (date: string) => [...substituteKeys.all, 'board', date] as const,
   free: (date: string, slotId: number) => [...substituteKeys.all, 'free', date, slotId] as const,
+  combine: (date: string, slotId: number) =>
+    [...substituteKeys.all, 'combine', date, slotId] as const,
 }
 
 export const substitutesApi = {
@@ -79,6 +120,9 @@ export const substitutesApi = {
   free: (date: string, slotId: number) =>
     api.get<FreeTeachers>('/admin/substitutes/free', { date, slot_id: slotId }),
   assign: (input: AssignInput) => api.post<SubstituteBoard>('/admin/substitutes', input),
+  combineOptions: (date: string, slotId: number) =>
+    api.get<CombineOptions>('/admin/substitutes/combine-options', { date, slot_id: slotId }),
+  combine: (input: CombineInput) => api.post<SubstituteBoard>('/admin/substitutes/combine', input),
   auto: (date: string) => api.post<AutoAssignResult>('/admin/substitutes/auto', { date }),
   remove: (id: number) => api.delete<SubstituteBoard>(`/admin/substitutes/${id}`),
 }
@@ -95,6 +139,15 @@ export function useFreeTeachers(date: string, slotId: number) {
   return useQuery({
     queryKey: substituteKeys.free(date, slotId),
     queryFn: () => substitutesApi.free(date, slotId),
+    staleTime: 0,
+  })
+}
+
+export function useCombineOptions(date: string, slotId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: substituteKeys.combine(date, slotId),
+    queryFn: () => substitutesApi.combineOptions(date, slotId),
+    enabled,
     staleTime: 0,
   })
 }

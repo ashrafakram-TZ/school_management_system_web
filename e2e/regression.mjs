@@ -1411,7 +1411,7 @@ await D5(
     expected: '"Choose a teacher to take this period"',
   },
   async () => {
-    await page.getByRole('button', { name: /^Assign a proxy for period/ }).first().click()
+    await page.getByRole('button', { name: /^Assign a proxy or combine the class for period/ }).first().click()
     await click(dialog(), 'Assign proxy')
     await see('Choose a teacher to take this period', dialog())
   }
@@ -1426,8 +1426,8 @@ await D5(
     expected: 'Toast "… will take period …", then "… removed from period …"',
   },
   async () => {
-    await page.getByRole('button', { name: /^Assign a proxy for period/ }).first().click()
-    await dialog().getByRole('radio').first().click()
+    await page.getByRole('button', { name: /^Assign a proxy or combine the class for period/ }).first().click()
+    await dialog().getByRole('radiogroup', { name: 'Free teachers' }).getByRole('radio').first().click()
     await click(dialog(), 'Assign proxy')
     await see(/will take period/)
     await page.getByRole('button', { name: /^Remove .+ from period/ }).first().click()
@@ -1906,6 +1906,62 @@ await TA(
       await page.waitForTimeout(800)
       if (await page.getByText('Only the Administrative officer (AO) or the super admin assigns proxies').count())
         throw new Error('AO is told it cannot assign')
+    }
+  )
+  const combineCase = await (async () => {
+    for (let offset = 0; offset < 7; offset += 1) {
+      const day = new Date(Date.now() + 5.5 * 3600 * 1000 + offset * 86400000).toISOString().slice(0, 10)
+      const board = (await api('GET', `/admin/substitutes?date=${day}`)).data
+      for (const period of (board?.teachers ?? []).flatMap((item) => item.periods)) {
+        if (period.substitution_id) continue
+        const options = (await api('GET', `/admin/substitutes/combine-options?date=${day}&slot_id=${period.slot_id}`)).data
+        if (options?.targets.length >= 1) return { day, period, options }
+      }
+    }
+    return null
+  })()
+  await TA(
+    {
+      id: 'CB-01',
+      module: 'Combine class',
+      type: 'Validation',
+      title: 'Combining needs a section',
+      steps: 'As the AO, Proxy, Assign on a period, Combine class, Combine class without choosing.',
+      expected: '"Choose the section the class joins"',
+    },
+    async () => {
+      if (!combineCase) return
+      await go(`/substitutes?date=${combineCase.day}`)
+      await page.getByRole('button', { name: `Assign a proxy or combine the class for period ${combineCase.period.period_no}` }).first().click()
+      await dialog().getByRole('radio', { name: 'Combine class' }).click()
+      await see(`${combineCase.options.students.boys} boys`, dialog())
+      await dialog().getByRole('button', { name: 'Combine class' }).last().click()
+      await see('Choose the section the class joins', dialog())
+    }
+  )
+  await TA(
+    {
+      id: 'CB-02',
+      module: 'Combine class',
+      type: 'Add',
+      title: 'Combine the whole class with another section, then remove',
+      steps: 'Combine class, Whole class to one section, choose the first section, Combine class; then Remove.',
+      expected: '"Combined class" with "Whole class … →", then removed',
+    },
+    async () => {
+      if (!combineCase) return
+      const target = combineCase.options.targets[0].section.name
+      await go(`/substitutes?date=${combineCase.day}`)
+      await page.getByRole('button', { name: `Assign a proxy or combine the class for period ${combineCase.period.period_no}` }).first().click()
+      await dialog().getByRole('radio', { name: 'Combine class' }).click()
+      await pick(dialog(), 'Sit with section', target)
+      await dialog().getByRole('button', { name: 'Combine class' }).last().click()
+      await see(/combined$/)
+      await see(`→ ${target}`)
+      await page.getByRole('button', { name: `Remove the combined class from period ${combineCase.period.period_no}` }).first().click()
+      const confirm = page.getByRole('alertdialog')
+      if (await confirm.count()) await confirm.getByRole('button', { name: /Remove/ }).last().click()
+      await see('Combined class removed')
     }
   )
   await aoContext.close()

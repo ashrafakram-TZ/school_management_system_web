@@ -67,7 +67,9 @@ export function SubstitutesPage() {
     try {
       await remove.mutateAsync(period.substitution_id)
       alerts.success(
-        `${period.substitute?.name ?? 'Proxy'} removed from period ${period.period_no}`
+        period.kind === 'combine'
+          ? `Combined class removed from period ${period.period_no}`
+          : `${period.substitute?.name ?? 'Proxy'} removed from period ${period.period_no}`
       )
     } catch (error) {
       alerts.error(toApiError(error).message)
@@ -113,7 +115,7 @@ export function SubstitutesPage() {
       key: 'covered',
       label: 'Covered',
       value: data?.covered ?? 0,
-      hint: 'Proxy assigned',
+      hint: 'Proxy or combined class',
       icon: CircleCheck,
       tone: 'success',
     },

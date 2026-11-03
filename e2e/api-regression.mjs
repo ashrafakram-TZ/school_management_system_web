@@ -2087,6 +2087,65 @@ await AO(
   }
 )
 
+const CB = (id, method, endpoint, scenario, expected, fn) =>
+  check({ id, module: 'Combine class', method, endpoint, scenario, expected, day: 'AO and logo' }, fn)
+const combineCase = await (async () => {
+  for (let offset = 0; offset < 7; offset += 1) {
+    const day = new Date(Date.now() + 5.5 * 3600 * 1000 + offset * 86400000).toISOString().slice(0, 10)
+    const board = (await ao('GET', `/admin/substitutes?date=${day}`)).body?.data
+    for (const period of (board?.teachers ?? []).flatMap((item) => item.periods)) {
+      if (period.substitution_id) continue
+      const options = (await ao('GET', `/admin/substitutes/combine-options?date=${day}&slot_id=${period.slot_id}`)).body?.data
+      if (options?.targets.length >= 2) return { day, period, options }
+    }
+  }
+  return null
+})()
+await CB('API-CB-01', 'POST', '/admin/substitutes/combine', 'Combine with nothing filled', '400 VALIDATION_FAILED on date, slot_id, mode', async () =>
+  expectFields(await ao('POST', '/admin/substitutes/combine', {}), ['date', 'slot_id', 'mode'])
+)
+await CB('API-CB-02', 'GET', '/admin/substitutes/combine-options', 'Sections the class can sit with', '200 with boys and girls count and running sections', async () => {
+  if (!combineCase) return 'Skipped: no uncovered period with two running sections this week'
+  const { options } = combineCase
+  if (options.students.total !== options.students.boys + options.students.girls) throw new Error('Counts do not add up')
+  if (options.targets.some((item) => item.section.id === combineCase.period.section.id)) throw new Error('Own section listed')
+  return `200, ${options.students.total} students, targets ${options.targets.map((item) => item.section.name).join(', ')}`
+})
+await CB('API-CB-03', 'POST', '/admin/substitutes/combine', 'Boys and girls to the same section', '400 on girls_section_id', async () => {
+  if (!combineCase) return 'Skipped: no case'
+  const target = combineCase.options.targets[0].section.id
+  return expectFields(
+    await ao('POST', '/admin/substitutes/combine', { date: combineCase.day, slot_id: combineCase.period.slot_id, mode: 'split', boys_section_id: target, girls_section_id: target }),
+    ['girls_section_id']
+  )
+})
+await CB('API-CB-04', 'POST', '/admin/substitutes/combine', 'Section with no class in that period', '409 SECTION_NOT_AVAILABLE', async () => {
+  if (!combineCase) return 'Skipped: no case'
+  return expectStatus(
+    await ao('POST', '/admin/substitutes/combine', { date: combineCase.day, slot_id: combineCase.period.slot_id, mode: 'whole', section_id: 999999 }),
+    409,
+    'SECTION_NOT_AVAILABLE'
+  )
+})
+await CB('API-CB-05', 'POST', '/admin/substitutes/combine', 'School admin tries to combine', '403 FORBIDDEN', async () => {
+  if (!combineCase) return 'Skipped: no case'
+  return expectStatus(
+    await admin('POST', '/admin/substitutes/combine', { date: combineCase.day, slot_id: combineCase.period.slot_id, mode: 'whole', section_id: combineCase.options.targets[0].section.id }),
+    403,
+    'FORBIDDEN'
+  )
+})
+await CB('API-CB-06', 'POST', '/admin/substitutes/combine', 'AO splits boys and girls, then removes it', '200 kind combine with two groups, covered; removed', async () => {
+  if (!combineCase) return 'Skipped: no case'
+  const [boys, girls] = combineCase.options.targets
+  const result = await ao('POST', '/admin/substitutes/combine', { date: combineCase.day, slot_id: combineCase.period.slot_id, mode: 'split', boys_section_id: boys.section.id, girls_section_id: girls.section.id })
+  expectStatus(result, 200)
+  const period = result.body.data.teachers.flatMap((item) => item.periods).find((item) => item.slot_id === combineCase.period.slot_id)
+  if (period.kind !== 'combine' || period.combined_into.length !== 2) throw new Error(JSON.stringify(period.combined_into))
+  expectStatus(await ao('DELETE', `/admin/substitutes/${period.substitution_id}`), 200)
+  return `200, ${period.combined_into.map((item) => `${item.group} ${item.students} -> ${item.section.name}`).join(', ')}; removed`
+})
+
 await admin('DELETE', `/admin/students/${studentId}`)
 if (userId) await admin('DELETE', `/admin/users/${userId}`)
 
