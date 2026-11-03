@@ -27,6 +27,8 @@ import {
   studentsSearchSchema,
 } from '@/features/students/search'
 import { payrollSearchSchema } from '@/features/payroll/search'
+import { feesSearchSchema } from '@/features/fees/search'
+import { examsSearchSchema } from '@/features/exams/search'
 import { substitutesSearchSchema } from '@/features/substitutes/search'
 import { timetableSearchSchema } from '@/features/timetable/search'
 import { transportSearchSchema } from '@/features/transport/search'
@@ -208,6 +210,20 @@ const payrollRoute = createRoute({
   ),
 })
 
+const feesRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/fees',
+  validateSearch: feesSearchSchema,
+  component: lazyRouteComponent(() => import('@/features/fees/pages/fees-page'), 'FeesPage'),
+})
+
+const examsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/exams',
+  validateSearch: examsSearchSchema,
+  component: lazyRouteComponent(() => import('@/features/exams/pages/exams-page'), 'ExamsPage'),
+})
+
 const transportRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/transport',
@@ -262,6 +278,8 @@ const routeTree = rootRoute.addChildren([
     timetableRoute,
     substitutesRoute,
     payrollRoute,
+    feesRoute,
+    examsRoute,
     transportRoute,
     routeBuilderRoute,
     setupRoute,
@@ -278,6 +296,7 @@ export const router = createRouter({
   context: { queryClient },
   defaultPreload: 'intent',
   scrollRestoration: true,
+  getScrollRestorationKey: (location) => location.pathname,
 })
 
 declare module '@tanstack/react-router' {

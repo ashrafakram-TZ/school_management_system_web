@@ -1793,6 +1793,217 @@ await D6(
   }
 )
 
+const TA = (id, module, method, endpoint, scenario, expected, fn) =>
+  check({ id, module, method, endpoint, scenario, expected, day: 'Teacher app' }, fn)
+const teacherRoster = teacherSection
+  ? ((await teacher('GET', `/mobile/teacher/sections/${teacherSection}/students`)).body?.data ?? [])
+  : []
+const rosterStudent = teacherRoster[0]
+await TA(
+  'API-TA-01',
+  'Teacher app',
+  'GET',
+  '/mobile/teacher/timetable/today',
+  "Teacher's day with student count per period",
+  '200 with periods, kind and students',
+  async () => {
+    const result = await teacher('GET', '/mobile/teacher/timetable/today')
+    expectStatus(result, 200)
+    const day = result.body.data
+    if (!Array.isArray(day.periods) || !day.periods.length) throw new Error('No periods')
+    const lesson = day.periods.find((item) => item.kind === 'class' || item.kind === 'substitute')
+    if (lesson && !(lesson.students >= 0)) throw new Error('students count missing')
+    return `200, ${day.day_name}, ${day.my_periods} periods${lesson ? `, ${lesson.section.name} has ${lesson.students} students` : ''}`
+  }
+)
+await TA(
+  'API-TA-02',
+  'Teacher app',
+  'GET',
+  '/mobile/teacher/timetable/today',
+  'Parent opens the teacher timetable',
+  '403 FORBIDDEN',
+  async () => expectStatus(await parent('GET', '/mobile/teacher/timetable/today'), 403)
+)
+await TA(
+  'API-TA-03',
+  'Teacher app',
+  'GET',
+  '/mobile/teacher/students/:id/history',
+  'Full history of a student in my section',
+  '200 with attendance, behaviour, achievements, results',
+  async () => {
+    if (!rosterStudent) return 'Skipped: teacher has no section'
+    const result = await teacher('GET', `/mobile/teacher/students/${rosterStudent.id}/history`)
+    expectStatus(result, 200)
+    const data = result.body.data
+    for (const key of ['attendance_year', 'attendance_month', 'behaviour', 'achievements', 'results'])
+      if (!(key in data)) throw new Error(`${key} missing`)
+    return `200, ${data.student.full_name}: ${data.attendance_year.percent}% attendance, ${data.results.length} results, ${data.achievements.length} achievements`
+  }
+)
+await TA(
+  'API-TA-04',
+  'Teacher app',
+  'GET',
+  '/mobile/teacher/students/:id/history',
+  'History of a student outside my sections',
+  '403 NOT_YOUR_SECTION',
+  async () => {
+    const others = (await admin('GET', '/admin/students?limit=50')).body.data.items
+    const outsider = others.find((item) => !teacherRoster.some((row) => row.id === item.id))
+    if (!outsider) return 'Skipped: every student is in my section'
+    return expectStatus(
+      await teacher('GET', `/mobile/teacher/students/${outsider.id}/history`),
+      403,
+      'NOT_YOUR_SECTION'
+    )
+  }
+)
+await TA(
+  'API-TA-05',
+  'Achievements',
+  'POST',
+  '/mobile/teacher/students/:id/achievements',
+  'Add an achievement with nothing filled',
+  '400 VALIDATION_FAILED on title, category, achieved_on',
+  async () => {
+    if (!rosterStudent) return 'Skipped: teacher has no section'
+    return expectFields(
+      await teacher('POST', `/mobile/teacher/students/${rosterStudent.id}/achievements`, {}),
+      ['title', 'category', 'achieved_on']
+    )
+  }
+)
+await TA(
+  'API-TA-06',
+  'Achievements',
+  'POST',
+  '/mobile/teacher/students/:id/achievements',
+  'Teacher adds an achievement; admin sees it and deletes it',
+  '201, listed for admin, 200 on delete',
+  async () => {
+    if (!rosterStudent) return 'Skipped: teacher has no section'
+    const added = await teacher('POST', `/mobile/teacher/students/${rosterStudent.id}/achievements`, {
+      title: `Regression quiz ${RUN}`,
+      category: 'competition',
+      level: 'district',
+      position: '2nd place',
+      achieved_on: TODAY_IST,
+    })
+    expectStatus(added, 201)
+    const list = (await admin('GET', `/admin/students/${rosterStudent.id}/achievements`)).body.data
+    if (!list.some((item) => item.id === added.body.data.id)) throw new Error('Admin list does not show it')
+    expectStatus(
+      await admin('DELETE', `/admin/students/${rosterStudent.id}/achievements/${added.body.data.id}`),
+      200
+    )
+    return `201 "${added.body.data.title}", admin sees it, deleted`
+  }
+)
+await TA(
+  'API-TA-07',
+  'Achievements',
+  'GET',
+  '/mobile/parent/children/:id/achievements',
+  "Parent sees the child's achievements",
+  '200 list',
+  async () => {
+    const result = await parent('GET', `/mobile/parent/children/${child.id}/achievements`)
+    expectStatus(result, 200)
+    return `200, ${result.body.data.length} achievements`
+  }
+)
+await TA(
+  'API-TA-08',
+  'Exams',
+  'GET',
+  '/admin/exams',
+  'Exam list',
+  '200 paginated',
+  async () => {
+    const result = await admin('GET', '/admin/exams?limit=5')
+    expectStatus(result, 200)
+    return `200, ${result.body.data.total} exams`
+  }
+)
+await TA(
+  'API-TA-09',
+  'Exams',
+  'POST',
+  '/admin/exams',
+  'Create an exam with nothing filled',
+  '400 VALIDATION_FAILED',
+  async () => expectStatus(await admin('POST', '/admin/exams', {}), 400, 'VALIDATION_FAILED')
+)
+await TA(
+  'API-TA-10',
+  'Exams',
+  'GET',
+  '/admin/exams/:id/toppers',
+  'Top rank holders of the latest exam',
+  '200',
+  async () => {
+    const exam = (await admin('GET', '/admin/exams?limit=1')).body.data.items[0]
+    if (!exam) return 'Skipped: no exam yet'
+    const result = await admin('GET', `/admin/exams/${exam.id}/toppers`)
+    expectStatus(result, 200)
+    return `200, ${exam.name}`
+  }
+)
+await TA(
+  'API-TA-11',
+  'Exams',
+  'GET',
+  '/mobile/teacher/sections/:id/ranking',
+  'Teacher sees the section ranking',
+  '200',
+  async () => {
+    if (!teacherSection) return 'Skipped: teacher has no section'
+    return expectStatus(await teacher('GET', `/mobile/teacher/sections/${teacherSection}/ranking`), 200)
+  }
+)
+await TA(
+  'API-TA-12',
+  'Fees',
+  'GET',
+  '/admin/fees/insights',
+  'Fee insight counts',
+  '200',
+  async () => expectStatus(await admin('GET', '/admin/fees/insights'), 200)
+)
+await TA(
+  'API-TA-13',
+  'Fees',
+  'POST',
+  '/admin/fees/heads',
+  'Fee head with nothing filled',
+  '400 VALIDATION_FAILED',
+  async () => expectStatus(await admin('POST', '/admin/fees/heads', {}), 400, 'VALIDATION_FAILED')
+)
+await TA(
+  'API-TA-14',
+  'Fees',
+  'GET',
+  '/mobile/parent/children/:id/fees',
+  "Parent sees the child's fees",
+  '200',
+  async () => expectStatus(await parent('GET', `/mobile/parent/children/${child.id}/fees`), 200)
+)
+await TA(
+  'API-TA-15',
+  'Fees',
+  'GET',
+  '/mobile/teacher/sections/:id/students',
+  'Roster carries the fee key (filled for the class teacher only)',
+  '200 with fee on each row',
+  async () => {
+    if (!rosterStudent) return 'Skipped: teacher has no section'
+    if (!('fee' in rosterStudent)) throw new Error('fee key missing')
+    return `200, first fee: ${JSON.stringify(rosterStudent.fee).slice(0, 60)}`
+  }
+)
+
 await admin('DELETE', `/admin/students/${studentId}`)
 if (userId) await admin('DELETE', `/admin/users/${userId}`)
 

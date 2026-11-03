@@ -1637,6 +1637,194 @@ await D6(
   }
 )
 
+const TA = (meta, fn) => test({ ...meta, day: 'Teacher app' }, fn)
+await TA(
+  {
+    id: 'EX-01',
+    module: 'Exams',
+    type: 'View',
+    title: 'Exams page lists exams with tabs for marks and results',
+    steps: 'Open Exams.',
+    expected: 'Exams, Marks entry and Results tabs',
+  },
+  async () => {
+    await go('/exams')
+    await page.getByRole('tab', { name: 'Marks entry' }).waitFor({ timeout: 8000 })
+    await page.getByRole('tab', { name: 'Results' }).waitFor()
+  }
+)
+await TA(
+  {
+    id: 'EX-02',
+    module: 'Exams',
+    type: 'Validation',
+    title: 'New exam needs a name and dates',
+    steps: 'Exams, New exam, submit empty.',
+    expected: '"Enter the exam name"',
+  },
+  async () => {
+    await go('/exams')
+    await click(page, 'New exam')
+    await dialog().getByRole('button', { name: 'Create exam' }).click()
+    await see('Enter the exam name', dialog())
+  }
+)
+await TA(
+  {
+    id: 'EX-03',
+    module: 'Exams',
+    type: 'View',
+    title: 'Dashboard shows the top rank holders',
+    steps: 'Open the dashboard.',
+    expected: '"Top rank holders" card',
+  },
+  async () => {
+    await go('/')
+    await see('Top rank holders')
+  }
+)
+await TA(
+  {
+    id: 'EX-04',
+    module: 'Exams',
+    type: 'Filter',
+    title: 'Result cards filter the ranking table',
+    steps: 'Exams, Results, click Passed, then click it again.',
+    expected: 'Only Pass rows while active; all rows after the second click',
+  },
+  async () => {
+    await go('/exams?tab=results')
+    const passed = page.getByRole('button', { name: /^Passed/ })
+    await passed.waitFor({ timeout: 8000 })
+    const rows = page.locator('table tbody tr')
+    await rows.first().waitFor({ timeout: 8000 })
+    const all = await rows.count()
+    await passed.click()
+    await page.waitForTimeout(400)
+    if ((await passed.getAttribute('aria-pressed')) !== 'true') throw new Error('Card did not turn on')
+    const results = await page.locator('table tbody tr td:nth-last-child(2)').allInnerTexts()
+    if (results.some((text) => text.trim() !== 'Pass')) throw new Error(`Non-pass rows shown: ${results.join(',')}`)
+    await passed.click()
+    await page.waitForTimeout(400)
+    if ((await rows.count()) !== all) throw new Error('All rows did not come back')
+  }
+)
+await TA(
+  {
+    id: 'IN-01',
+    module: 'Insight cards',
+    type: 'View',
+    title: 'Clicking an insight card brings its list into view',
+    steps: 'Students, click the first insight card.',
+    expected: 'Page scrolls down to the list instead of jumping to the top',
+  },
+  async () => {
+    await go('/students')
+    const card = page.locator('div.grid.grid-cols-2 > button[aria-pressed]').first()
+    await card.waitFor({ timeout: 8000 })
+    await card.click()
+    await page.waitForTimeout(900)
+    const top = await card.evaluate((el) => {
+      const list = el.parentElement.nextElementSibling
+      return Math.round(list.getBoundingClientRect().top)
+    })
+    const room = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight - scrollY)
+    if (Math.abs(top - 80) > 30 && room > 2) throw new Error(`List is ${top}px from the top`)
+    await card.click()
+  }
+)
+await TA(
+  {
+    id: 'FE-01',
+    module: 'Fees',
+    type: 'View',
+    title: 'Fees page with dues, plans and payments',
+    steps: 'Open Fees.',
+    expected: 'Dues, Fee plans and Payments tabs',
+  },
+  async () => {
+    await go('/fees')
+    await page.getByRole('tab', { name: 'Fee plans' }).waitFor({ timeout: 8000 })
+    await page.getByRole('tab', { name: 'Payments' }).waitFor()
+  }
+)
+await TA(
+  {
+    id: 'FE-02',
+    module: 'Fees',
+    type: 'Validation',
+    title: 'Fee head needs a name',
+    steps: 'Fees, Fee plans, Add head, submit empty.',
+    expected: '"Enter a name of at least 2 letters"',
+  },
+  async () => {
+    await go('/fees?tab=plans')
+    await click(page, 'Add head')
+    await dialog().getByRole('button', { name: 'Add head' }).last().click()
+    await see('Enter a name of at least 2 letters', dialog())
+  }
+)
+await TA(
+  {
+    id: 'AC-01',
+    module: 'Achievements',
+    type: 'Validation',
+    title: 'Achievement needs a title',
+    steps: 'Student, Achievements tab, Add achievement, submit empty.',
+    expected: '"Enter the achievement, at least 3 letters"',
+  },
+  async () => {
+    const target = (await api('GET', '/admin/students?limit=1')).data.items[0]
+    await go(`/students/${target.id}?tab=achievements`)
+    await click(page, 'Add achievement')
+    await dialog().getByRole('button', { name: 'Save' }).click()
+    await see('Enter the achievement, at least 3 letters', dialog())
+  }
+)
+await TA(
+  {
+    id: 'AC-02',
+    module: 'Achievements',
+    type: 'Add',
+    title: 'Add an achievement from the student page',
+    steps: 'Achievements tab, fill title, level State, position, save; then delete it.',
+    expected: 'Card with the title and "State level"',
+  },
+  async () => {
+    const target = (await api('GET', '/admin/students?limit=1')).data.items[0]
+    await go(`/students/${target.id}?tab=achievements`)
+    await click(page, 'Add achievement')
+    const title = `RT state chess ${Date.now() % 100000}`
+    await fill(dialog(), 'Achievement', title)
+    await pick(dialog(), 'Level', 'State')
+    await fill(dialog(), 'Position', '1st place')
+    await dialog().getByRole('button', { name: 'Save' }).click()
+    await see(title)
+    await see('State level')
+    const saved = (await api('GET', `/admin/students/${target.id}/achievements`)).data.find(
+      (item) => item.title === title
+    )
+    if (saved) await api('DELETE', `/admin/students/${target.id}/achievements/${saved.id}`)
+  }
+)
+await TA(
+  {
+    id: 'AC-03',
+    module: 'Student records',
+    type: 'View',
+    title: 'Student page has Results and Fees tabs',
+    steps: 'Open a student.',
+    expected: 'Results and Fees tabs visible',
+  },
+  async () => {
+    const target = (await api('GET', '/admin/students?limit=1')).data.items[0]
+    await go(`/students/${target.id}`)
+    await page.getByRole('tab', { name: /Results/ }).waitFor({ timeout: 8000 })
+    await page.getByRole('tab', { name: /Fees/ }).waitFor()
+    await page.getByRole('tab', { name: /Achievements/ }).waitFor()
+  }
+)
+
 {
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -1654,6 +1842,8 @@ await D6(
     ['RS-07', '/payroll', 'Payroll runs'],
     ['RS-08', '/transport', 'Buses and routes'],
     ['RS-09', '/fleet', 'Trips today'],
+    ['RS-10', '/exams', 'Marks entry'],
+    ['RS-11', '/fees', 'Fee plans'],
   ]) {
     await test(
       {

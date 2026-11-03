@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { can, useMe } from '@/features/auth/api'
+import { TopRankHoldersCard } from '@/features/exams/components/top-rank-holders-card'
 import { useFleetLive, VEHICLE_STATE } from '@/features/fleet/api'
 import { useStaffInsights } from '@/features/staff/api'
 import { useAdmissionInsights, useStudentInsights } from '@/features/students/api'
@@ -43,6 +44,7 @@ export function DashboardPage() {
         {can(me, 'fleet.view') && <BusTile />}
       </div>
       {can(me, 'fleet.view') && <BusMap />}
+      {can(me, 'exams.view') && <TopRankHoldersCard />}
     </Page>
   )
 }

@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -27,9 +28,24 @@ const tones: Record<InsightTone, { icon: string; ring: string }> = {
   neutral: { icon: 'bg-muted text-muted-foreground', ring: 'ring-ring/40 border-ring/50' },
 }
 
+const HEADER_OFFSET = 80
+
+function scrollToResults(cards: HTMLElement | null) {
+  let from: HTMLElement | null = cards
+  while (from && !from.nextElementSibling && from.tagName !== 'MAIN') from = from.parentElement
+  const target = from?.nextElementSibling
+  if (!(target instanceof HTMLElement)) return
+  window.setTimeout(() => {
+    if (!target.isConnected) return
+    const top = target.getBoundingClientRect().top + window.scrollY - HEADER_OFFSET
+    window.scrollTo({ top, behavior: 'smooth' })
+  }, 120)
+}
+
 export function InsightCards({ items, loading }: { items: Insight[]; loading?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null)
   return (
-    <div className='grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3'>
+    <div ref={ref} className='grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3'>
       {items.map((item) => {
         const tone = tones[item.tone ?? 'primary']
         const interactive = Boolean(item.onClick)
@@ -38,7 +54,14 @@ export function InsightCards({ items, loading }: { items: Insight[]; loading?: b
           <Tag
             key={item.key}
             type={interactive ? 'button' : undefined}
-            onClick={item.onClick}
+            onClick={
+              item.onClick
+                ? () => {
+                    item.onClick?.()
+                    scrollToResults(ref.current)
+                  }
+                : undefined
+            }
             aria-pressed={interactive ? Boolean(item.active) : undefined}
             className={cn(
               'group flex min-w-0 items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-left shadow-xs transition-[box-shadow,border-color]',

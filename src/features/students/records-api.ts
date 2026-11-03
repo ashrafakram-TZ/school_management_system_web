@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { NewDocument, VerifiableDoc } from '@/components/common/document-list'
 import { api } from '@/lib/api/client'
+import type { UploadedFile } from '@/lib/files'
 import type { Ref } from './api'
 import { studentKeys } from './api'
 
@@ -157,12 +158,43 @@ export interface PromotionInput {
   detained_ids?: number[]
 }
 
+export type AchievementCategory =
+  'academic' | 'sports' | 'arts' | 'cultural' | 'competition' | 'leadership' | 'other'
+export type AchievementLevel =
+  'class' | 'school' | 'zone' | 'district' | 'state' | 'national' | 'international'
+
+export interface Achievement {
+  id: number
+  title: string
+  category: AchievementCategory
+  level: AchievementLevel
+  position: string | null
+  achieved_on: string
+  description: string | null
+  file: UploadedFile | null
+  visible_to_parent: boolean
+  added_by: Ref | null
+  created_at: string
+}
+
+export interface AchievementInput {
+  title: string
+  category: AchievementCategory
+  level: AchievementLevel
+  position: string | null
+  achieved_on: string
+  description: string | null
+  file_id: number | null
+  visible_to_parent: boolean
+}
+
 export const recordKeys = {
   all: (id: number) => [...studentKeys.all, 'records', id] as const,
   counts: (id: number) => [...recordKeys.all(id), 'counts'] as const,
   documents: (id: number) => [...recordKeys.all(id), 'documents'] as const,
   health: (id: number) => [...recordKeys.all(id), 'health'] as const,
   behaviour: (id: number) => [...recordKeys.all(id), 'behaviour'] as const,
+  achievements: (id: number) => [...recordKeys.all(id), 'achievements'] as const,
   tc: (id: number) => [...recordKeys.all(id), 'tc'] as const,
   promotion: (classId: number) => [...studentKeys.all, 'promotion', classId] as const,
 }
@@ -201,6 +233,13 @@ export const recordsApi = {
     api.patch<BehaviourNote>(`${base(id)}/behaviour/${noteId}`, input),
   removeBehaviour: (id: number, noteId: number) =>
     api.delete<{ id: number }>(`${base(id)}/behaviour/${noteId}`),
+  achievements: (id: number) => api.get<Achievement[]>(`${base(id)}/achievements`),
+  addAchievement: (id: number, input: AchievementInput) =>
+    api.post<Achievement>(`${base(id)}/achievements`, input),
+  updateAchievement: (id: number, achievementId: number, input: Partial<AchievementInput>) =>
+    api.patch<Achievement>(`${base(id)}/achievements/${achievementId}`, input),
+  removeAchievement: (id: number, achievementId: number) =>
+    api.delete<null>(`${base(id)}/achievements/${achievementId}`),
   reissueCard: (id: number) => api.post<DigitalId>(`${base(id)}/id-card/reissue`),
   exit: (id: number, input: ExitInput) => api.post<TransferCertificate>(`${base(id)}/exit`, input),
   tc: (id: number) => api.get<TransferCertificate>(`${base(id)}/tc`),
@@ -238,6 +277,13 @@ export function useHealth(id: number) {
 
 export function useBehaviour(id: number) {
   return useQuery({ queryKey: recordKeys.behaviour(id), queryFn: () => recordsApi.behaviour(id) })
+}
+
+export function useAchievements(id: number) {
+  return useQuery({
+    queryKey: recordKeys.achievements(id),
+    queryFn: () => recordsApi.achievements(id),
+  })
 }
 
 export function useTransferCertificate(id: number, enabled: boolean) {

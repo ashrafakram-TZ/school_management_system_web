@@ -7,6 +7,7 @@ import {
   FileText,
   HeartPulse,
   IdCard,
+  IndianRupee,
   Link2,
   LogOut,
   NotebookPen,
@@ -17,6 +18,8 @@ import {
   School,
   Smartphone,
   Star,
+  Medal,
+  Trophy,
   UserRound,
   UsersRound,
   X,
@@ -39,11 +42,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { can, useMe } from '@/features/auth/api'
+import { StudentResults } from '@/features/exams/components/student-results'
+import { StudentFeesTab } from '@/features/fees/components/student-fees-tab'
 import { alerts } from '@/lib/alerts'
 import { toApiError } from '@/lib/api/errors'
 import { openFile } from '@/lib/files'
 import { formatDate } from '@/lib/format'
 import { studentsApi, useStudent, useStudentMutation, type StudentDetail } from '../api'
+import { AchievementsTab } from '../components/achievements-tab'
 import { BehaviourTab } from '../components/behaviour-tab'
 import { ExitModal } from '../components/exit-modal'
 import { HealthTab } from '../components/health-tab'
@@ -79,6 +85,8 @@ export function StudentPage() {
   const id = Number(studentId)
   const navigate = useNavigate()
   const canManage = can(useMe().data, 'students.manage')
+  const canSeeResults = can(useMe().data, 'exams.view')
+  const canSeeFees = can(useMe().data, 'fees.view')
   const student = useStudent(id)
   const counts = useRecordCounts(id)
   const data = student.data
@@ -254,6 +262,9 @@ export function StudentPage() {
             count: counts.data?.behaviour_notes,
           },
           { value: 'transport', label: 'Transport', icon: Bus },
+          { value: 'achievements', label: 'Achievements', icon: Medal },
+          ...(canSeeResults ? [{ value: 'results' as const, label: 'Results', icon: Trophy }] : []),
+          ...(canSeeFees ? [{ value: 'fees' as const, label: 'Fees', icon: IndianRupee }] : []),
         ]}
       />
 
@@ -268,6 +279,7 @@ export function StudentPage() {
       {tab === 'documents' && <DocumentsTab studentId={id} canManage={canManage} />}
       {tab === 'health' && <HealthTab studentId={id} canManage={canManage} />}
       {tab === 'behaviour' && <BehaviourTab studentId={id} canManage={canManage} />}
+      {tab === 'achievements' && <AchievementsTab studentId={id} canManage={canManage} />}
       {tab === 'transport' && (
         <Card className='p-4 sm:p-6'>
           <EmptyState
@@ -277,6 +289,9 @@ export function StudentPage() {
           />
         </Card>
       )}
+
+      {tab === 'results' && canSeeResults && <StudentResults studentId={id} />}
+      {tab === 'fees' && canSeeFees && <StudentFeesTab studentId={id} />}
 
       {modal === 'edit' && <EditStudentModal student={data} onClose={() => setModal(null)} />}
       {modal === 'class' && (

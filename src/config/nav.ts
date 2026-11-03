@@ -3,12 +3,14 @@ import {
   Building2,
   CalendarCheck,
   CalendarRange,
+  ClipboardCheck,
   ClipboardList,
   Repeat,
   Route,
   Wallet,
   GraduationCap,
   Grid3x3,
+  IndianRupee,
   HeartHandshake,
   LayoutDashboard,
   School,
@@ -30,6 +32,8 @@ export type NavPath =
   | '/timetable'
   | '/substitutes'
   | '/payroll'
+  | '/fees'
+  | '/exams'
   | '/transport'
   | '/notifications'
   | '/fleet'
@@ -136,6 +140,14 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: 'nav.substitutes',
         permission: 'timetable.view',
       },
+      {
+        to: '/exams',
+        label: 'Exams',
+        description: 'Exams, marks entry, ranked results and top rank holders',
+        icon: ClipboardCheck,
+        shortcut: 'nav.exams',
+        permission: 'exams.view',
+      },
     ],
   },
   {
@@ -148,6 +160,14 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Wallet,
         shortcut: 'nav.payroll',
         permission: 'payroll.view',
+      },
+      {
+        to: '/fees',
+        label: 'Fees',
+        description: 'Fee plans, invoices, payments, receipts and dues',
+        icon: IndianRupee,
+        shortcut: 'nav.fees',
+        permission: 'fees.view',
       },
     ],
   },

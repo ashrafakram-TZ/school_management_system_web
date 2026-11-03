@@ -4,7 +4,15 @@ import { api, type Paginated } from '@/lib/api/client'
 export type Channel = 'in_app' | 'push' | 'sms'
 export type NotificationStatus = 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'skipped'
 export type NotificationCategory =
-  'system' | 'account' | 'attendance' | 'transport' | 'diary' | 'chat' | 'meeting' | 'alert'
+  | 'system'
+  | 'account'
+  | 'attendance'
+  | 'transport'
+  | 'diary'
+  | 'chat'
+  | 'meeting'
+  | 'alert'
+  | 'fees'
 
 export interface MyNotification {
   id: number
