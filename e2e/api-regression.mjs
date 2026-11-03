@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const API = process.env.E2E_API_URL ?? 'http://localhost:3000/api/v1'
-const DAY = process.env.E2E_DAY ?? 'Day 5'
+const DAY = process.env.E2E_DAY ?? 'Day 6'
 const ROOT = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
 const OUT = path.join(ROOT, 'results')
 fs.mkdirSync(OUT, { recursive: true })
@@ -1706,6 +1706,90 @@ await check(
     const section = me.sections.find((item) => item.app === 'parent')
     if (!section?.roles.length) throw new Error('No Parent section with roles')
     return `200, mobile_apps ${JSON.stringify(me.mobile_apps)}, sections ${me.sections.map((item) => item.label).join(', ')}`
+  }
+)
+
+const D6 = (id, module, method, endpoint, scenario, expected, fn) =>
+  check({ id, module, method, endpoint, scenario, expected, day: 'Day 6' }, fn)
+await D6(
+  'API-TP-01',
+  'Live trips',
+  'POST',
+  '/integrations/telematics/events',
+  'Trip event without a valid signature',
+  '401 SIGNATURE_INVALID',
+  async () => expectStatus(await guest('POST', '/integrations/telematics/events', { type: 'trip.started' }), 401, 'SIGNATURE_INVALID')
+)
+await D6(
+  'API-TP-02',
+  'Live trips',
+  'POST',
+  '/admin/transport/trips',
+  'Start a trip with nothing filled',
+  '400 VALIDATION_FAILED on route_id, kind',
+  async () => expectFields(await admin('POST', '/admin/transport/trips', {}), ['route_id', 'kind'])
+)
+await D6(
+  'API-TP-03',
+  'Live trips',
+  'GET',
+  '/admin/transport/trips/:id',
+  'Latest trip: stop timeline in travel order and events',
+  '200, every stop approached before it was reached',
+  async () => {
+    const list = await admin('GET', '/admin/transport/trips?limit=1')
+    expectStatus(list, 200)
+    const latest = list.body.data.items[0]
+    if (!latest) return 'Skipped: no trip has run yet'
+    const detail = (await admin('GET', `/admin/transport/trips/${latest.id}`)).body.data
+    for (const stop of detail.stop_list.filter((item) => item.arrived_at)) {
+      if (!stop.approached_at || new Date(stop.approached_at) > new Date(stop.arrived_at))
+        throw new Error(`${stop.name}: approaching did not come before arrival`)
+    }
+    return `200, trip ${latest.id} ${latest.status}, ${detail.stop_list.length} stops, ${detail.events.length} events`
+  }
+)
+await D6(
+  'API-TP-04',
+  'Live trips',
+  'GET',
+  '/mobile/parent/children/:id/bus',
+  'Parent bus card',
+  '200 with status and headline (null when the child walks)',
+  async () => {
+    const result = await parent('GET', `/mobile/parent/children/${child.id}/bus`)
+    expectStatus(result, 200)
+    const bus = result.body.data
+    return bus ? `200, ${bus.status}: "${bus.headline}"` : '200, child does not use the bus'
+  }
+)
+await D6(
+  'API-TP-05',
+  'Live trips',
+  'GET',
+  '/mobile/driver/trips/today',
+  'Parent opens the driver screen',
+  '403 FORBIDDEN',
+  async () => expectStatus(await parent('GET', '/mobile/driver/trips/today'), 403)
+)
+await D6(
+  'API-TP-06',
+  'Live trips',
+  'WS',
+  '/live',
+  'Socket without a token',
+  'Connection refused with TOKEN_MISSING',
+  async () => {
+    const { io } = await import('socket.io-client')
+    const origin = API.replace(/\/api\/v1$/, '')
+    const socket = io(`${origin}/live`, { transports: ['websocket'], reconnection: false, timeout: 5000 })
+    const outcome = await new Promise((resolve) => {
+      socket.on('connect', () => resolve('connected'))
+      socket.on('connect_error', (error) => resolve(error.data?.error ?? error.message))
+    })
+    socket.close()
+    if (outcome !== 'TOKEN_MISSING') throw new Error(`Got ${outcome}`)
+    return 'refused: TOKEN_MISSING'
   }
 )
 

@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Map as MapIcon, Pencil, Plus, Route as RouteIcon, Trash2 } from 'lucide-react'
+import { Map as MapIcon, Pencil, Plus, Radio, Route as RouteIcon, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { DataTable, type Column } from '@/components/common/data-table'
 import { ListToolbar } from '@/components/common/list-toolbar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { today } from '@/features/attendance/labels'
+import { useTrips } from '@/features/fleet/api'
 import { run } from '@/features/setup/form-actions'
 import { cn } from '@/lib/utils'
 import { transportApi, useBusRoutes, useTransportMutation, type BusRoute } from '../api'
@@ -36,39 +38,58 @@ export function RoutesTab({ canManage }: { canManage: boolean }) {
   const [removing, setRemoving] = useState<BusRoute | null>(null)
   const remove = useTransportMutation((id: number) => transportApi.removeRoute(id))
   const rows = routes.data ?? []
+  const activeTrips = useTrips({ page: 1, limit: 50, date: today(), status: 'active' }, false)
+  const liveTripOf = (routeId: number) =>
+    activeTrips.data?.items.find((trip) => trip.route.id === routeId)
 
   const openBuilder = (id: number) =>
     navigate({ to: '/transport/routes/$routeId', params: { routeId: id } })
 
-  const actions = (route: BusRoute) => (
-    <span className='flex flex-wrap items-center justify-end gap-1'>
-      <Button size='sm' variant='outline' onClick={() => openBuilder(route.id)}>
-        <MapIcon />
-        Open builder
-      </Button>
-      {canManage && (
-        <>
+  const actions = (route: BusRoute) => {
+    const liveTrip = liveTripOf(route.id)
+    return (
+      <span className='flex flex-wrap items-center justify-end gap-1'>
+        {liveTrip && (
           <Button
-            size='icon-sm'
-            variant='ghost'
-            aria-label={`Edit route ${route.code}`}
-            onClick={() => setEditing(route)}
+            size='sm'
+            variant='outline'
+            aria-label={`Open live trip on route ${route.code}`}
+            onClick={() =>
+              navigate({ to: '/fleet/trips/$tripId', params: { tripId: liveTrip.id } })
+            }
           >
-            <Pencil />
+            <Radio className='text-success' />
+            Open live trip
           </Button>
-          <Button
-            size='icon-sm'
-            variant='ghost'
-            aria-label={`Delete route ${route.code}`}
-            className='text-destructive hover:bg-destructive/10'
-            onClick={() => setRemoving(route)}
-          >
-            <Trash2 />
-          </Button>
-        </>
-      )}
-    </span>
-  )
+        )}
+        <Button size='sm' variant='outline' onClick={() => openBuilder(route.id)}>
+          <MapIcon />
+          Open builder
+        </Button>
+        {canManage && (
+          <>
+            <Button
+              size='icon-sm'
+              variant='ghost'
+              aria-label={`Edit route ${route.code}`}
+              onClick={() => setEditing(route)}
+            >
+              <Pencil />
+            </Button>
+            <Button
+              size='icon-sm'
+              variant='ghost'
+              aria-label={`Delete route ${route.code}`}
+              className='text-destructive hover:bg-destructive/10'
+              onClick={() => setRemoving(route)}
+            >
+              <Trash2 />
+            </Button>
+          </>
+        )}
+      </span>
+    )
+  }
 
   const title = (route: BusRoute) => (
     <span className='flex min-w-0 items-center gap-2'>

@@ -5,7 +5,7 @@ import { chromium } from 'playwright-core'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5173'
 const CHROME = process.env.E2E_CHROME ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-const DAY = process.env.E2E_DAY ?? 'Day 5'
+const DAY = process.env.E2E_DAY ?? 'Day 6'
 const ROOT = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
 const OUT = path.join(ROOT, 'results')
 const SHOTS = path.join(OUT, 'screenshots')
@@ -1586,6 +1586,57 @@ await D5(
   }
 )
 
+const D6 = (meta, fn) => test({ ...meta, day: 'Day 6' }, fn)
+await D6(
+  {
+    id: 'LT-01',
+    module: 'Live trips',
+    type: 'View',
+    title: 'Bus tracking is live and lists today’s trips',
+    steps: 'Open Bus tracking.',
+    expected: 'Live badge and the Trips today panel',
+  },
+  async () => {
+    await go('/fleet')
+    await see('Trips today')
+    await page.getByRole('status', { name: 'Live updates on' }).waitFor({ timeout: 10000 })
+  }
+)
+await D6(
+  {
+    id: 'LT-02',
+    module: 'Live trips',
+    type: 'Validation',
+    title: 'Starting a trip needs a route',
+    steps: 'Bus tracking, Start trip, submit with no route.',
+    expected: '"Choose a route"',
+  },
+  async () => {
+    await go('/fleet')
+    await click(page, 'Start trip')
+    await dialog().getByRole('button', { name: 'Start trip' }).click()
+    await see('Choose a route', dialog())
+  }
+)
+await D6(
+  {
+    id: 'LT-03',
+    module: 'Live trips',
+    type: 'View',
+    title: 'Trip page shows the stop timeline and events',
+    steps: 'Open the latest trip.',
+    expected: 'Stops in travel order, Events and Not boarded sections',
+  },
+  async () => {
+    const latest = (await api('GET', '/admin/transport/trips?limit=1')).data?.items?.[0]
+    if (!latest) return
+    await go(`/fleet/trips/${latest.id}`)
+    await page.getByLabel('Stops in travel order').waitFor({ timeout: 8000 })
+    await page.getByLabel('Trip events').waitFor()
+    await see('Not boarded')
+  }
+)
+
 {
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -1602,6 +1653,7 @@ await D5(
     ['RS-06', '/substitutes', 'Teachers away'],
     ['RS-07', '/payroll', 'Payroll runs'],
     ['RS-08', '/transport', 'Buses and routes'],
+    ['RS-09', '/fleet', 'Trips today'],
   ]) {
     await test(
       {

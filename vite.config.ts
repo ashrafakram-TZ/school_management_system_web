@@ -6,11 +6,10 @@ import { defineConfig, loadEnv } from 'vite'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const port = Number(env.VITE_PORT || 5173)
+  const target = env.VITE_API_PROXY_TARGET || 'http://localhost:3000'
   const proxy = {
-    '/api': {
-      target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
-      changeOrigin: true,
-    },
+    '/api': { target, changeOrigin: true },
+    '/socket.io': { target, changeOrigin: true, ws: true },
   }
 
   return {

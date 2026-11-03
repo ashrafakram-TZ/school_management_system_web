@@ -48,7 +48,7 @@ http.interceptors.request.use((request) => {
 
 let refreshing: Promise<string | null> | null = null
 
-const refreshAccessToken = () => {
+export const refreshAccessToken = () => {
   if (refreshing) return refreshing
   const current = session.get()
   if (!current) return Promise.resolve(null)

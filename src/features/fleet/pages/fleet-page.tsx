@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   BatteryMedium,
@@ -32,19 +33,30 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
+import { today } from '@/features/attendance/labels'
+import { can, useMe } from '@/features/auth/api'
+import { useBuses } from '@/features/transport/api'
 import { useNow } from '@/hooks/use-now'
+import { useSelectedSchool } from '@/lib/auth/school-context'
 import { formatDateTime, formatNumber, timeAgo } from '@/lib/format'
+import { useLiveEvent, useLiveSubscription, type LivePosition } from '@/lib/live/socket'
 import { cn } from '@/lib/utils'
 import {
   ALERT_LABELS,
   EVENT_LABELS,
+  fleetKeys,
   harshTotal,
   useFleetLive,
   usePositions,
+  useTrips,
   VEHICLE_STATE,
   type Vehicle,
   type VehicleState,
 } from '../api'
+import { LiveBadge } from '../components/live-badge'
+import { StartTripModal } from '../components/start-trip-modal'
+import { TripsPanel } from '../components/trips-panel'
+import { showTripToast } from '../labels'
 
 type Filter = 'all' | 'moving' | 'idle' | 'parked' | 'offline' | 'attention'
 
@@ -62,13 +74,67 @@ const duration = (since: string | null, now: number) => {
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min`
 }
 
+const newer = (live: LivePosition | undefined, polled: Vehicle['position']) =>
+  live && (!polled || new Date(live.recorded_at) > new Date(polled.recorded_at))
+
 export function FleetPage() {
   const live = useFleetLive()
   const now = useNow()
+  const queryClient = useQueryClient()
+  const canManage = can(useMe().data, 'fleet.manage')
+  const schoolId = useSelectedSchool()
+  const socket = useLiveSubscription('fleet.subscribe', schoolId ? { school_id: schoolId } : {})
+  const date = today()
+  const trips = useTrips({ page: 1, limit: 50, date }, !socket.live)
+  const buses = useBuses({ page: 1, limit: 100 })
   const [filter, setFilter] = useState<Filter>('all')
   const [openId, setOpenId] = useState<number | null>(null)
+  const [starting, setStarting] = useState(false)
+  const [livePositions, setLivePositions] = useState<Record<number, LivePosition>>({})
   const data = live.data
-  const all = data?.vehicles ?? []
+  const polled = data?.vehicles ?? []
+
+  const trackerOf = (busId: number) => {
+    const bus = buses.data?.items.find((item) => item.id === busId)
+    if (!bus?.device) return null
+    return (
+      polled.find((vehicle) => bus.device!.imei && vehicle.imei === bus.device!.imei) ??
+      polled.find((vehicle) => vehicle.id === bus.device!.id) ??
+      null
+    )
+  }
+  const busName = (busId: number) =>
+    trips.data?.items.find((trip) => trip.vehicle.id === busId)?.vehicle.name ??
+    buses.data?.items.find((bus) => bus.id === busId)?.name ??
+    'A bus'
+
+  useLiveEvent('trip.position', (message) => {
+    const tracker = trackerOf(message.vehicle_id)
+    if (!tracker) return
+    setLivePositions((current) => ({ ...current, [tracker.id]: message.position }))
+  })
+
+  useLiveEvent('trip.event', (message) => {
+    void queryClient.invalidateQueries({ queryKey: [...fleetKeys.all, 'trips'] })
+    const trip = trips.data?.items.find((item) => item.id === message.trip_id)
+    showTripToast(message, busName(message.vehicle_id), trip?.kind)
+  })
+
+  const all = polled.map((vehicle): Vehicle => {
+    const fresh = livePositions[vehicle.id]
+    if (!newer(fresh, vehicle.position) || !fresh) return vehicle
+    return {
+      ...vehicle,
+      position: {
+        lat: fresh.lat,
+        lng: fresh.lng,
+        speed: fresh.speed,
+        heading: fresh.heading,
+        ignition: vehicle.position?.ignition ?? null,
+        recorded_at: fresh.recorded_at,
+      },
+    }
+  })
   const vehicles = all.filter((vehicle) => matches(vehicle, filter))
   const open = all.find((vehicle) => vehicle.id === openId) ?? null
   const attention = all.filter((vehicle) => vehicle.alerts.length > 0).length
@@ -198,7 +264,8 @@ export function FleetPage() {
       <PageHeader
         eyebrow='Fleet'
         title='Bus tracking'
-        description='Where every bus is, whether the engine is on, fuel, battery and harsh driving. Updates every few seconds.'
+        description='Where every bus is, whether the engine is on, fuel, battery and harsh driving. Buses on a trip move live.'
+        actions={<LiveBadge status={socket.status} state={socket.state} />}
       />
       {live.isError && !data ? (
         <Card className='p-6'>
@@ -207,27 +274,38 @@ export function FleetPage() {
       ) : (
         <>
           <InsightCards items={cards} loading={live.isPending} />
-          <Card className='overflow-hidden'>
-            {live.isPending ? (
-              <Skeleton className='h-[360px] rounded-none' />
-            ) : (
-              <FleetMap
-                className='h-[300px] sm:h-[360px]'
-                emptyText='No bus has sent its position yet'
-                onSelect={setOpenId}
-                points={vehicles
-                  .filter((vehicle) => vehicle.position)
-                  .map((vehicle) => ({
-                    id: vehicle.id,
-                    lat: vehicle.position!.lat,
-                    lng: vehicle.position!.lng,
-                    label: vehicle.name,
-                    sublabel: `${VEHICLE_STATE[vehicle.state].label} · ${formatNumber(vehicle.position!.speed, 0, ' km/h')}`,
-                    color: VEHICLE_STATE[vehicle.state].color,
-                  }))}
-              />
-            )}
-          </Card>
+          <div className='grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]'>
+            <Card className='min-w-0 overflow-hidden'>
+              {live.isPending ? (
+                <Skeleton className='h-[360px] rounded-none xl:h-[420px]' />
+              ) : (
+                <FleetMap
+                  className='h-[300px] sm:h-[360px] xl:h-[420px]'
+                  emptyText='No bus has sent its position yet'
+                  onSelect={setOpenId}
+                  points={vehicles
+                    .filter((vehicle) => vehicle.position)
+                    .map((vehicle) => ({
+                      id: vehicle.id,
+                      lat: vehicle.position!.lat,
+                      lng: vehicle.position!.lng,
+                      label: vehicle.name,
+                      sublabel: `${VEHICLE_STATE[vehicle.state].label} · ${formatNumber(vehicle.position!.speed, 0, ' km/h')}`,
+                      color: VEHICLE_STATE[vehicle.state].color,
+                    }))}
+                />
+              )}
+            </Card>
+            <TripsPanel
+              trips={trips.data?.items}
+              loading={trips.isPending}
+              error={trips.isError ? trips.error.message : null}
+              onRetry={() => trips.refetch()}
+              canManage={canManage}
+              onStart={() => setStarting(true)}
+              className='min-w-0 overflow-hidden xl:h-[422px]'
+            />
+          </div>
           <Card className='overflow-hidden'>
             <div className='flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3'>
               <SegmentedControl
@@ -290,6 +368,7 @@ export function FleetPage() {
         </>
       )}
       <VehicleSheet vehicle={open} now={now} onClose={() => setOpenId(null)} />
+      {starting && <StartTripModal onClose={() => setStarting(false)} />}
     </Page>
   )
 }

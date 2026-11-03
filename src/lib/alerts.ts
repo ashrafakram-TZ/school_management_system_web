@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 interface AlertOptions {
   description?: string
   duration?: number
+  id?: string | number
 }
 
 export const alerts = {

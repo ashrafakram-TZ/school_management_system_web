@@ -91,6 +91,16 @@ const fleetRoute = createRoute({
   component: lazyRouteComponent(() => import('@/features/fleet/pages/fleet-page'), 'FleetPage'),
 })
 
+const tripRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/fleet/trips/$tripId',
+  params: {
+    parse: (raw) => ({ tripId: z.coerce.number().int().min(1).parse(raw.tripId) }),
+    stringify: (params) => ({ tripId: String(params.tripId) }),
+  },
+  component: lazyRouteComponent(() => import('@/features/fleet/pages/trip-page'), 'TripPage'),
+})
+
 const studentsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/students',
@@ -259,6 +269,7 @@ const routeTree = rootRoute.addChildren([
     usersRoute,
     notificationsRoute,
     fleetRoute,
+    tripRoute,
   ]),
 ])
 
