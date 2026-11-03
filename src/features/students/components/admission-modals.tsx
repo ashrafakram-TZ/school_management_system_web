@@ -64,6 +64,7 @@ function ApplicationForm({
     guardian_relation: 'father',
     guardian_email: '',
     previous_school: '',
+    identification_marks: '',
     notes: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -96,6 +97,7 @@ function ApplicationForm({
         guardian_relation: draft.guardian_relation as Relation,
         guardian_email: draft.guardian_email.trim() || null,
         previous_school: draft.previous_school.trim() || null,
+        identification_marks: draft.identification_marks.trim() || null,
         notes: draft.notes.trim() || null,
       })
       alerts.success(`Application ${admission.application_no} saved`)
@@ -176,6 +178,20 @@ function ApplicationForm({
               id='app-previous'
               value={draft.previous_school}
               onChange={(event) => set('previous_school', event.target.value)}
+            />
+          </FormField>
+          <FormField
+            id='app-marks'
+            label='Identification marks'
+            hint='Birth marks, moles or scars. Printed on the TC.'
+            className='sm:col-span-2'
+          >
+            <Input
+              id='app-marks'
+              maxLength={255}
+              placeholder='e.g. A mole on the left cheek, a scar on the right thumb'
+              value={draft.identification_marks}
+              onChange={(event) => set('identification_marks', event.target.value)}
             />
           </FormField>
         </div>

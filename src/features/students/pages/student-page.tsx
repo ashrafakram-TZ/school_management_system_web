@@ -382,6 +382,7 @@ function ProfileTab({
               ['Blood group', student.blood_group ?? '—'],
               ['Admitted on', formatDate(student.admission_date)],
               ['Previous school', student.previous_school ?? '—'],
+              ['Identification marks', student.identification_marks ?? '—'],
               [
                 'Address',
                 [student.address_line, student.city, student.pincode].filter(Boolean).join(', ') ||

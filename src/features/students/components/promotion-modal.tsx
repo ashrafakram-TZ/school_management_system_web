@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Plus } from 'lucide-react'
 import { AppModal } from '@/components/common/app-modal'
 import { Combobox } from '@/components/common/combobox'
 import { ErrorState } from '@/components/common/display'
@@ -7,7 +7,8 @@ import { FormField } from '@/components/common/form-field'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useClasses } from '@/features/setup/api'
+import { can, useMe } from '@/features/auth/api'
+import { setupApi, useClasses, useSections, useSetupMutation } from '@/features/setup/api'
 import { alerts } from '@/lib/alerts'
 import { toApiError } from '@/lib/api/errors'
 import { cn } from '@/lib/utils'
@@ -32,6 +33,48 @@ export function PromotionModal({ onClose }: { onClose: () => void }) {
   const data = preview.data
   const toClassId = target.for === classId ? target.classId : (data?.suggested_class?.id ?? null)
   const toSectionId = target.for === classId ? target.sectionId : null
+  const nextYearId = data?.to_year.id
+  const nextSections = useSections(
+    toClassId ?? undefined,
+    Boolean(toClassId && nextYearId),
+    nextYearId
+  )
+  const thisYearSections = useSections(toClassId ?? undefined, Boolean(toClassId))
+  const canSetUp = can(useMe().data, 'schools.manage')
+  const addSections = useSetupMutation(
+    (input: { classId: number; yearId: number; names: [string, string | null, number][] }) =>
+      Promise.all(
+        input.names.map(([name, room, capacity]) =>
+          setupApi.createSection({
+            class_id: input.classId,
+            academic_year_id: input.yearId,
+            name,
+            room,
+            capacity,
+          })
+        )
+      )
+  )
+  const toClassName = classes.data?.find((item) => item.id === toClassId)?.name
+  const noNextSections = Boolean(toClassId && nextSections.data && nextSections.data.length === 0)
+  const createNextSections = async () => {
+    if (!toClassId || !nextYearId) return
+    const names: [string, string | null, number][] = thisYearSections.data?.length
+      ? thisYearSections.data.map((item) => [item.name, item.room, item.capacity])
+      : [['A', null, 40]]
+    try {
+      const created = await addSections.mutateAsync({
+        classId: toClassId,
+        yearId: nextYearId,
+        names,
+      })
+      alerts.success(
+        `Added ${created.map((item) => `Section ${item.name}`).join(', ')} to Class ${toClassName} for ${data?.to_year.name}`
+      )
+    } catch (error) {
+      alerts.error(toApiError(error).message)
+    }
+  }
   const waiting = data?.students.filter((student) => !student.already_moved) ?? []
   const moving = waiting.length - detained.length
 
@@ -74,7 +117,7 @@ export function PromotionModal({ onClose }: { onClose: () => void }) {
       }
     >
       <div className='grid gap-4'>
-        <div className='grid gap-4 sm:grid-cols-[1fr_auto_1fr_1fr] sm:items-end'>
+        <div className='grid gap-4 sm:grid-cols-[1fr_auto_1fr_1fr] sm:items-start'>
           <FormField id='promote-from' label='Class this year'>
             <Combobox
               id='promote-from'
@@ -94,7 +137,12 @@ export function PromotionModal({ onClose }: { onClose: () => void }) {
               className='sm:w-full'
             />
           </FormField>
-          <ArrowRight className='mb-2.5 hidden size-5 text-muted-foreground sm:block' />
+          <div aria-hidden className='hidden gap-1.5 sm:grid'>
+            <span className='invisible text-xs font-semibold'>to</span>
+            <span className='flex h-9 items-center'>
+              <ArrowRight className='size-5 text-muted-foreground' />
+            </span>
+          </div>
           <FormField id='promote-to' label={data ? `Class in ${data.to_year.name}` : 'Next class'}>
             <Combobox
               id='promote-to'
@@ -116,9 +164,25 @@ export function PromotionModal({ onClose }: { onClose: () => void }) {
             id='promote-section'
             label='Section'
             hint={
-              data && !data.to_sections.length
-                ? 'Add sections for next year in School setup'
-                : undefined
+              noNextSections ? (
+                canSetUp ? (
+                  <Button
+                    type='button'
+                    variant='link'
+                    size='sm'
+                    className='h-auto p-0 text-xs'
+                    loading={addSections.isPending}
+                    onClick={() => void createNextSections()}
+                  >
+                    <Plus className='size-3.5' />
+                    {thisYearSections.data?.length
+                      ? `Add ${thisYearSections.data.map((item) => item.name).join(', ')} for ${data?.to_year.name}`
+                      : `Add Section A for ${data?.to_year.name}`}
+                  </Button>
+                ) : (
+                  `No sections in Class ${toClassName} for ${data?.to_year.name} yet`
+                )
+              ) : undefined
             }
           >
             <Combobox
@@ -127,14 +191,11 @@ export function PromotionModal({ onClose }: { onClose: () => void }) {
               value={toSectionId ? String(toSectionId) : undefined}
               placeholder='Allocate later'
               allLabel='Allocate later'
-              options={
-                toClassId === data?.suggested_class?.id
-                  ? (data?.to_sections ?? []).map((item) => ({
-                      value: String(item.id),
-                      label: `Section ${item.name}`,
-                    }))
-                  : []
-              }
+              options={(nextSections.data ?? []).map((item) => ({
+                value: String(item.id),
+                label: `Section ${item.name}`,
+                hint: item.room ?? undefined,
+              }))}
               onChange={(value) =>
                 setTarget({
                   classId: toClassId,

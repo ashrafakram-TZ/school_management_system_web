@@ -7,12 +7,15 @@ export function DateStepper({
   id,
   value,
   onChange,
+  allowFuture = false,
 }: {
   id: string
   value: string
   onChange: (value: string) => void
+  allowFuture?: boolean
 }) {
   const now = today()
+  const max = allowFuture ? undefined : now
   return (
     <div className='flex flex-wrap items-center gap-2'>
       <div className='flex items-center gap-1'>
@@ -29,7 +32,7 @@ export function DateStepper({
           type='date'
           aria-label='Date'
           value={value}
-          max={now}
+          max={max}
           onChange={(event) => event.target.value && onChange(event.target.value)}
           className='w-40'
         />
@@ -37,7 +40,7 @@ export function DateStepper({
           variant='outline'
           size='icon'
           aria-label='Next day'
-          disabled={value >= now}
+          disabled={max !== undefined && value >= max}
           onClick={() => onChange(shiftDate(value, 1))}
         >
           <ChevronRight />

@@ -10,7 +10,10 @@ import {
   MapPin,
   Navigation,
   PauseCircle,
+  Route,
+  Thermometer,
   Timer,
+  Wrench,
 } from 'lucide-react'
 import { DataTable, type Column } from '@/components/common/data-table'
 import { EmptyState, ErrorState } from '@/components/common/display'
@@ -106,7 +109,7 @@ export function FleetPage() {
       key: 'attention',
       label: 'Need attention',
       value: attention,
-      hint: `${data?.harsh_events_today ?? 0} harsh events today · ${data?.low_fuel ?? 0} low fuel`,
+      hint: `${data?.harsh_events_today ?? 0} harsh events today · ${data?.low_fuel ?? 0} low fuel${data?.engine_faults ? ` · ${data.engine_faults} engine faults` : ''}`,
       icon: AlertTriangle,
       tone: attention ? 'danger' : 'neutral',
       active: filter === 'attention',
@@ -435,6 +438,36 @@ function VehicleSheet({
                 <Tile icon={AlertTriangle} label='Harsh today'>
                   <Harsh vehicle={vehicle} />
                 </Tile>
+                {vehicle.obd && (
+                  <>
+                    <Tile icon={Gauge} label='Engine'>
+                      {formatNumber(vehicle.obd.rpm, 0, ' rpm')}
+                    </Tile>
+                    <Tile icon={Thermometer} label='Coolant'>
+                      <span
+                        className={
+                          (vehicle.obd.coolant_c ?? 0) > 105
+                            ? 'font-semibold text-destructive'
+                            : undefined
+                        }
+                      >
+                        {formatNumber(vehicle.obd.coolant_c, 0, ' °C')}
+                      </span>
+                    </Tile>
+                    <Tile icon={Wrench} label='Fault codes'>
+                      {vehicle.obd.dtc.length ? (
+                        <span className='font-mono text-destructive'>
+                          {vehicle.obd.dtc.join(', ')}
+                        </span>
+                      ) : (
+                        'None'
+                      )}
+                    </Tile>
+                    <Tile icon={Route} label='Odometer'>
+                      {formatNumber(vehicle.obd.odometer_km, 0, ' km')}
+                    </Tile>
+                  </>
+                )}
               </div>
               {!vehicle.position && (
                 <EmptyState

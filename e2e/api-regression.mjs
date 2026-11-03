@@ -2,13 +2,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const API = process.env.E2E_API_URL ?? 'http://localhost:3000/api/v1'
-const DAY = process.env.E2E_DAY ?? 'Day 4'
+const DAY = process.env.E2E_DAY ?? 'Day 5'
 const ROOT = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
 const OUT = path.join(ROOT, 'results')
 fs.mkdirSync(OUT, { recursive: true })
 const RUN = String(Date.now()).slice(-5)
 const mobile = (n) => `97${RUN}${String(n).padStart(3, '0')}`
 const results = []
+const TODAY_IST = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10)
 
 function tokenFrom(stateFile) {
   const file = path.join(ROOT, stateFile)
@@ -125,10 +126,12 @@ const expectFields = (result, wanted) => {
   return `400 VALIDATION_FAILED on ${wanted.join(', ')}`
 }
 
-const admin = client(await sessionFor('.auth-admin.json', '9876543210'))
+const adminToken = await sessionFor('.auth-admin.json', '9876543210')
+const admin = client(adminToken)
 const guest = client(null)
 const parent = client(await sessionFor('.auth-parent.json', '9000000005'))
-const teacher = client(await sessionFor('.auth-teacher.json', '9000000004'))
+const teacherToken = await sessionFor('.auth-teacher.json', '9000000004')
+const teacher = client(teacherToken)
 
 const C = (id, module, method, endpoint, scenario, expected, fn) =>
   check({ id, module, method, endpoint, scenario, expected }, fn)
@@ -505,7 +508,7 @@ await C(
     expectFields(
       await admin('POST', `/admin/students/${studentId}/exit`, {
         exit_type: 'transferred',
-        leaving_date: '2026-11-02',
+        leaving_date: TODAY_IST,
       }),
       ['reason']
     )
@@ -520,7 +523,7 @@ await C(
   async () => {
     const result = await admin('POST', `/admin/students/${studentId}/exit`, {
       exit_type: 'transferred',
-      leaving_date: '2026-11-02',
+      leaving_date: TODAY_IST,
       reason: 'API test',
     })
     if (!/-TC-\d{4}-\d{4}$/.test(result.body?.data?.tc_no ?? '')) throw new Error('No TC number')
@@ -538,7 +541,7 @@ await C(
     expectStatus(
       await admin('POST', `/admin/students/${studentId}/exit`, {
         exit_type: 'withdrawn',
-        leaving_date: '2026-11-02',
+        leaving_date: TODAY_IST,
         reason: 'Again',
       }),
       409,
@@ -852,6 +855,77 @@ await C(
     if (response.status !== 401 || body.error !== 'API_KEY_INVALID')
       throw new Error(`${response.status} ${body.error}`)
     return '401 API_KEY_INVALID'
+  }
+)
+
+await check(
+  {
+    id: 'API-ST-20',
+    module: 'Students',
+    method: 'PATCH',
+    endpoint: '/admin/students/:id',
+    scenario: 'Save identification marks',
+    expected: '200 and the marks come back on the student',
+    day: 'Day 4',
+  },
+  async () => {
+    const marks = 'A mole on the left cheek'
+    expectStatus(await admin('PATCH', `/admin/students/${studentId}`, { identification_marks: marks }), 200)
+    const detail = await admin('GET', `/admin/students/${studentId}`)
+    if (detail.body.data.identification_marks !== marks)
+      throw new Error(`Got ${detail.body.data.identification_marks}`)
+    return '200, identification_marks saved'
+  }
+)
+await check(
+  {
+    id: 'API-ST-21',
+    module: 'Students',
+    method: 'PATCH',
+    endpoint: '/admin/students/:id',
+    scenario: 'Identification marks longer than 255 characters',
+    expected: '400 VALIDATION_FAILED on identification_marks',
+    day: 'Day 4',
+  },
+  async () =>
+    expectFields(
+      await admin('PATCH', `/admin/students/${studentId}`, { identification_marks: 'x'.repeat(256) }),
+      ['identification_marks']
+    )
+)
+await check(
+  {
+    id: 'API-SU-20',
+    module: 'School setup',
+    method: 'POST',
+    endpoint: '/admin/sections',
+    scenario: 'Add a section for next academic year (used by Promote)',
+    expected: '201 in the next year; listed only for that year',
+    day: 'Day 4',
+  },
+  async () => {
+    const years = (await admin('GET', '/admin/academic-years')).body.data
+    const list = Array.isArray(years) ? years : (years.items ?? [])
+    const current = list.find((year) => year.is_current)
+    const next = list
+      .filter((year) => year.start_date > (current?.start_date ?? ''))
+      .sort((a, b) => a.start_date.localeCompare(b.start_date))[0]
+    if (!next) return 'Skipped: no next academic year'
+    const classes = (await admin('GET', '/admin/classes')).body.data
+    const target = (Array.isArray(classes) ? classes : classes.items)[0]
+    const name = `Z${RUN.slice(-2)}`
+    const created = await admin('POST', '/admin/sections', {
+      class_id: target.id,
+      academic_year_id: next.id,
+      name,
+    })
+    expectStatus(created, 201)
+    const inNext = (await admin('GET', `/admin/sections?class_id=${target.id}&academic_year_id=${next.id}`)).body.data
+    const inCurrent = (await admin('GET', `/admin/sections?class_id=${target.id}`)).body.data
+    await admin('DELETE', `/admin/sections/${created.body.data.id}`)
+    if (!inNext.some((item) => item.name === name)) throw new Error('Not listed for next year')
+    if (inCurrent.some((item) => item.name === name)) throw new Error('Leaked into the current year')
+    return `201 in ${next.name}, not in ${current?.name}`
   }
 )
 
@@ -1233,6 +1307,352 @@ await D4(
     const result = await teacher('GET', '/mobile/teacher/timetable')
     expectStatus(result, 200)
     return `200, ${result.body.data.periods_per_week} periods a week`
+  }
+)
+
+const D5 = (id, module, method, endpoint, scenario, expected, fn) =>
+  check({ id, module, method, endpoint, scenario, expected, day: 'Day 5' }, fn)
+const nextSchoolDay = (() => {
+  let offset = 1
+  while (new Date(`${istDate(offset)}T00:00:00Z`).getUTCDay() === 0) offset += 1
+  return istDate(offset)
+})()
+const teacherMe = (await teacher('GET', '/me')).body?.data
+let coverPeriod = null
+let substitutionId = 0
+
+await D5(
+  'API-SB-01',
+  'Substitutes',
+  'GET',
+  '/admin/substitutes',
+  `Board for ${nextSchoolDay}, when a teacher is on approved leave`,
+  '200 with the absent teacher and the periods to cover',
+  async () => {
+    const result = await admin('GET', `/admin/substitutes?date=${nextSchoolDay}`)
+    expectStatus(result, 200)
+    const board = result.body.data
+    if (!board.absent_teachers) return `Skipped: nobody is away on ${nextSchoolDay}`
+    for (const away of board.teachers) {
+      for (const period of away.periods) {
+        const free = (await admin('GET', `/admin/substitutes/free?date=${nextSchoolDay}&slot_id=${period.slot_id}`))
+          .body.data
+        if (free.teachers.some((row) => row.teacher.id === teacherMe?.id) && !period.substitute) {
+          coverPeriod = period
+          break
+        }
+      }
+      if (coverPeriod) break
+    }
+    return `200, ${board.absent_teachers} away, ${board.periods} periods, ${board.uncovered} not covered`
+  }
+)
+await D5(
+  'API-SB-02',
+  'Substitutes',
+  'POST',
+  '/admin/substitutes',
+  'Assign with nothing filled',
+  '400 VALIDATION_FAILED on date, slot_id, substitute_user_id',
+  async () => expectFields(await admin('POST', '/admin/substitutes', {}), ['date', 'slot_id', 'substitute_user_id'])
+)
+await D5(
+  'API-SB-03',
+  'Substitutes',
+  'POST',
+  '/admin/substitutes',
+  'Assign for a date in the past',
+  '400 VALIDATION_FAILED on date',
+  async () =>
+    expectFields(
+      await admin('POST', '/admin/substitutes', { date: istDate(-7), slot_id: 1, substitute_user_id: 1 }),
+      ['date']
+    )
+)
+await D5(
+  'API-SB-04',
+  'Substitutes',
+  'POST',
+  '/admin/substitutes',
+  'Assign a free teacher and check they are told',
+  '201, period covered, teacher gets SUBSTITUTE_ASSIGNED',
+  async () => {
+    if (!coverPeriod) return 'Skipped: no period where the demo teacher is free'
+    const result = await admin('POST', '/admin/substitutes', {
+      date: nextSchoolDay,
+      slot_id: coverPeriod.slot_id,
+      substitute_user_id: teacherMe.id,
+      note: 'Regression test',
+    })
+    expectStatus(result, 201)
+    const period = result.body.data.teachers.flatMap((row) => row.periods).find((row) => row.slot_id === coverPeriod.slot_id)
+    if (period?.substitute?.id !== teacherMe.id) throw new Error('Period not covered')
+    substitutionId = period.substitution_id
+    const inbox = (await teacher('GET', '/me/notifications?limit=20')).body?.data?.items ?? []
+    const alert = inbox.find((item) => item.template_code === 'SUBSTITUTE_ASSIGNED')
+    if (!alert) throw new Error('Teacher has no SUBSTITUTE_ASSIGNED notification')
+    return `201, covered by ${teacherMe.name}; notified: "${alert.title}"`
+  }
+)
+await D5(
+  'API-SB-05',
+  'Substitutes',
+  'GET',
+  '/mobile/teacher/substitutions',
+  'Teacher sees the class they cover',
+  '200 listing the substitution',
+  async () => {
+    if (!substitutionId) return 'Skipped: nothing assigned'
+    const result = await teacher('GET', '/mobile/teacher/substitutions')
+    expectStatus(result, 200)
+    if (!result.body.data.some((row) => row.id === substitutionId)) throw new Error('Not listed')
+    return `200, ${result.body.data.length} cover duties`
+  }
+)
+await D5(
+  'API-SB-06',
+  'Substitutes',
+  'DELETE',
+  '/admin/substitutes/:id',
+  'Remove the substitute again',
+  '200 and the period is uncovered',
+  async () => {
+    if (!substitutionId) return 'Skipped: nothing assigned'
+    const result = await admin('DELETE', `/admin/substitutes/${substitutionId}`)
+    expectStatus(result, 200)
+    const period = result.body.data.teachers.flatMap((row) => row.periods).find((row) => row.slot_id === coverPeriod.slot_id)
+    if (period?.substitute) throw new Error('Still covered')
+    return '200, period uncovered'
+  }
+)
+
+let draftRunId = 0
+await D5(
+  'API-PY-01',
+  'Payroll',
+  'PUT',
+  '/admin/payroll/salaries/:userId',
+  'Save a salary with no basic pay',
+  '400 VALIDATION_FAILED on effective_from, basic',
+  async () => expectFields(await admin('PUT', `/admin/payroll/salaries/${teacherMe?.id ?? 1}`, {}), ['effective_from', 'basic'])
+)
+await D5(
+  'API-PY-02',
+  'Payroll',
+  'POST',
+  '/admin/payroll/runs',
+  'Run payroll for a future month',
+  '400 VALIDATION_FAILED on month',
+  async () => {
+    const future = new Date(Date.now() + 70 * 86400000).toISOString().slice(0, 7)
+    return expectFields(await admin('POST', '/admin/payroll/runs', { month: future }), ['month'])
+  }
+)
+await D5(
+  'API-PY-03',
+  'Payroll',
+  'POST',
+  '/admin/payroll/runs',
+  'Run payroll for October 2026 as a draft',
+  '200 with payslips, totals and the staff left out',
+  async () => {
+    const result = await admin('POST', '/admin/payroll/runs', { month: '2026-10' })
+    if (result.body?.error === 'RUN_FINALIZED') return '409 RUN_FINALIZED (October already final)'
+    expectStatus(result, 200)
+    const run = result.body.data
+    draftRunId = run.id
+    if (!run.payslips.length) throw new Error('No payslips')
+    const bad = run.payslips.find((slip) => Math.abs(slip.gross - slip.total_deductions - slip.net) > 0.01)
+    if (bad) throw new Error(`Net does not add up for ${bad.name}`)
+    return `200, ${run.payslips.length} payslips, net ₹${run.total_net}, ${run.missing.length} without salary`
+  }
+)
+await D5(
+  'API-PY-04',
+  'Payroll',
+  'GET',
+  '/admin/payroll/payslips/:id/pdf',
+  'Payslip PDF',
+  '200 application/pdf',
+  async () => {
+    if (!draftRunId) return 'Skipped: no draft run'
+    const run = (await admin('GET', `/admin/payroll/runs/${draftRunId}`)).body.data
+    const response = await fetch(`${API}/admin/payroll/payslips/${run.payslips[0].id}/pdf`, {
+      headers: { authorization: `Bearer ${adminToken}` },
+    })
+    const bytes = Buffer.from(await response.arrayBuffer())
+    if (response.status !== 200 || !bytes.subarray(0, 4).equals(Buffer.from('%PDF')))
+      throw new Error(`Got ${response.status} ${response.headers.get('content-type')}`)
+    return `200 PDF, ${Math.round(bytes.length / 1024)} KB`
+  }
+)
+await D5(
+  'API-PY-05',
+  'Payroll',
+  'POST',
+  '/admin/payroll/runs/:id/finalize',
+  'Finalise September 2026 and the teacher downloads the payslip in the app',
+  '200 final; teacher sees it in /me/payslips and gets the PDF',
+  async () => {
+    let run = (await admin('GET', '/admin/payroll/runs?search=2026-09')).body.data.items[0]
+    if (!run || run.status !== 'finalized') {
+      const created = await admin('POST', '/admin/payroll/runs', { month: '2026-09' })
+      expectStatus(created, 200)
+      expectStatus(await admin('POST', `/admin/payroll/runs/${created.body.data.id}/finalize`), 200)
+    }
+    const mine = await teacher('GET', '/me/payslips')
+    expectStatus(mine, 200)
+    const slip = mine.body.data.items.find((item) => item.month === '2026-09')
+    if (!slip) throw new Error('Teacher has no September payslip')
+    const response = await fetch(`${API}/me/payslips/${slip.id}/pdf`, {
+      headers: { authorization: `Bearer ${teacherToken}` },
+    })
+    if (response.status !== 200) throw new Error(`PDF ${response.status}`)
+    const rerun = await admin('POST', '/admin/payroll/runs', { month: '2026-09' })
+    expectStatus(rerun, 409, 'RUN_FINALIZED')
+    return `final; teacher net ₹${slip.net}; PDF 200; re-run blocked with RUN_FINALIZED`
+  }
+)
+await D5(
+  'API-PY-06',
+  'Payroll',
+  'DELETE',
+  '/admin/payroll/runs/:id',
+  'Delete the October draft',
+  '200',
+  async () => {
+    if (!draftRunId) return 'Skipped: no draft run'
+    return expectStatus(await admin('DELETE', `/admin/payroll/runs/${draftRunId}`), 200)
+  }
+)
+
+await D5(
+  'API-TR-01',
+  'Transport',
+  'POST',
+  '/admin/transport/vehicles',
+  'Add a bus with nothing filled',
+  '400 VALIDATION_FAILED on registration_no, name',
+  async () => expectFields(await admin('POST', '/admin/transport/vehicles', {}), ['registration_no', 'name'])
+)
+await D5(
+  'API-TR-02',
+  'Transport',
+  'POST',
+  '/admin/transport/vehicles',
+  'Registration number in the wrong format',
+  '400 VALIDATION_FAILED on registration_no',
+  async () =>
+    expectFields(await admin('POST', '/admin/transport/vehicles', { registration_no: 'BUS-ONE', name: 'Bus X' }), [
+      'registration_no',
+    ])
+)
+await D5(
+  'API-TR-03',
+  'Transport',
+  'GET',
+  '/admin/transport/routes/:id',
+  'Every route is drawn: stops with coordinates and the school',
+  '200, each route has ordered stops and a distance',
+  async () => {
+    const routes = (await admin('GET', '/admin/transport/routes')).body.data
+    if (!routes.length) throw new Error('No routes')
+    const drawn = []
+    for (const route of routes) {
+      const detail = (await admin('GET', `/admin/transport/routes/${route.id}`)).body.data
+      if (detail.stop_list.length < 2) throw new Error(`${route.code} has fewer than 2 stops`)
+      const ordered = detail.stop_list.every((stop, index) => stop.sequence === index + 1)
+      if (!ordered || detail.stop_list.some((stop) => typeof stop.lat !== 'number')) throw new Error(`${route.code} stops are not usable`)
+      drawn.push(`${route.code} ${detail.stop_list.length} stops ${detail.distance_km} km`)
+    }
+    return `200, ${drawn.join('; ')}`
+  }
+)
+await D5(
+  'API-TR-04',
+  'Transport',
+  'PUT',
+  '/admin/transport/routes/:id/stops',
+  'Stop with a latitude out of range',
+  '400 VALIDATION_FAILED on the stop latitude',
+  async () => {
+    const route = (await admin('GET', '/admin/transport/routes')).body.data[0]
+    return expectFields(
+      await admin('PUT', `/admin/transport/routes/${route.id}/stops`, { items: [{ name: 'Bad stop', lat: 123, lng: 80 }] }),
+      ['items']
+    )
+  }
+)
+await D5(
+  'API-TR-05',
+  'Transport',
+  'POST',
+  '/admin/transport/routes',
+  'Create a route, add two stops, auto order, delete',
+  '201, stops saved, ordered, deleted',
+  async () => {
+    const code = `T${RUN.slice(-3)}`
+    const created = await admin('POST', '/admin/transport/routes', { code, name: `Regression ${RUN}` })
+    expectStatus(created, 201)
+    const id = created.body.data.id
+    const saved = await admin('PUT', `/admin/transport/routes/${id}/stops`, {
+      items: [
+        { name: 'Near stop', lat: 13.0849, lng: 80.2105 },
+        { name: 'Far stop', lat: 13.0846, lng: 80.1767 },
+      ],
+    })
+    expectStatus(saved, 200)
+    const ordered = await admin('POST', `/admin/transport/routes/${id}/auto-sequence`)
+    expectStatus(ordered, 200)
+    const first = ordered.body.data.stop_list[0].name
+    expectStatus(await admin('DELETE', `/admin/transport/routes/${id}`), 200)
+    if (first !== 'Far stop') throw new Error(`Auto order started at ${first}`)
+    return '201, 2 stops, auto order starts at the far stop, deleted'
+  }
+)
+await D5(
+  'API-TR-06',
+  'Transport',
+  'GET',
+  '/mobile/parent/children/:id/transport',
+  'Parent sees the bus, stop and times',
+  '200 with route and stop, or null when the child walks',
+  async () => {
+    if (!child) throw new Error('Demo parent has no child')
+    const result = await parent('GET', `/mobile/parent/children/${child.id}/transport`)
+    expectStatus(result, 200)
+    const card = result.body.data
+    return card ? `200, ${card.route.name}, ${card.stop.name} at ${card.stop.pickup_time}` : '200, child walks (null)'
+  }
+)
+await D5(
+  'API-TR-07',
+  'Transport',
+  'GET',
+  '/admin/transport/expiries',
+  'Documents ending within 30 days',
+  '200 with the seeded PUC, insurance and expired fitness',
+  async () => {
+    const result = await admin('GET', '/admin/transport/expiries?days=30')
+    expectStatus(result, 200)
+    const kinds = new Set(result.body.data.map((item) => item.kind))
+    if (!kinds.size) throw new Error('Nothing due')
+    return `200, ${result.body.data.length} due: ${[...kinds].join(', ')}`
+  }
+)
+
+await D5(
+  'API-TR-08',
+  'Transport',
+  'GET',
+  '/admin/transport/students',
+  'Students on the bus with the default sort, a search and paging',
+  '200 every time (was 500 before the fix)',
+  async () => {
+    for (const query of ['', '?search=a', '?route_id=1&page=2&limit=5']) {
+      expectStatus(await admin('GET', `/admin/transport/students${query}`), 200)
+    }
+    return '200 for default sort, search and page 2'
   }
 )
 

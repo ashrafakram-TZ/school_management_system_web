@@ -29,7 +29,7 @@ const tones: Record<InsightTone, { icon: string; ring: string }> = {
 
 export function InsightCards({ items, loading }: { items: Insight[]; loading?: boolean }) {
   return (
-    <div className='grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4'>
+    <div className='grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3'>
       {items.map((item) => {
         const tone = tones[item.tone ?? 'primary']
         const interactive = Boolean(item.onClick)
@@ -41,32 +41,34 @@ export function InsightCards({ items, loading }: { items: Insight[]; loading?: b
             onClick={item.onClick}
             aria-pressed={interactive ? Boolean(item.active) : undefined}
             className={cn(
-              'group grid gap-2 rounded-xl border bg-card p-4 text-left shadow-xs transition-[box-shadow,border-color,transform] sm:gap-3 sm:p-5',
+              'group flex min-w-0 items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-left shadow-xs transition-[box-shadow,border-color]',
               interactive &&
-                'cursor-pointer outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/40',
+                'cursor-pointer outline-none hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/40',
               item.active && cn('ring-2', tone.ring)
             )}
           >
-            <div className='flex items-start justify-between gap-2'>
-              <span className='text-xs leading-snug font-semibold text-muted-foreground'>
+            <span className={cn('grid size-9 shrink-0 place-items-center rounded-lg', tone.icon)}>
+              <item.icon className='size-4' />
+            </span>
+            <span className='grid min-w-0 flex-1 gap-0.5'>
+              <span className='truncate text-xs leading-tight font-semibold text-muted-foreground'>
                 {item.label}
               </span>
-              <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', tone.icon)}>
-                <item.icon className='size-4' />
+              <span className='flex min-w-0 items-baseline gap-2'>
+                {loading ? (
+                  <Skeleton className='h-6 w-12' />
+                ) : (
+                  <span className='tabular text-xl leading-tight font-extrabold tracking-tight'>
+                    {item.value}
+                  </span>
+                )}
+                {item.hint && (
+                  <span className='hidden truncate text-[11px] text-muted-foreground sm:inline'>
+                    {item.active ? 'Showing these · click to clear' : item.hint}
+                  </span>
+                )}
               </span>
-            </div>
-            {loading ? (
-              <Skeleton className='h-8 w-16' />
-            ) : (
-              <span className='tabular text-2xl font-extrabold tracking-tight sm:text-3xl'>
-                {item.value}
-              </span>
-            )}
-            {item.hint && (
-              <span className='truncate text-xs text-muted-foreground'>
-                {item.active ? 'Showing these · click to clear' : item.hint}
-              </span>
-            )}
+            </span>
           </Tag>
         )
       })}

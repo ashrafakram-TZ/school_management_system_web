@@ -133,5 +133,20 @@
     "status": "Fixed",
     "fix": "AppModal keeps its last content until the close animation ends (Add student, staff, admission and profile modals)",
     "retest": "Pass (closed cleanly in Chrome)"
+  },
+  {
+    "id": "BUG-010",
+    "day": "Day 5",
+    "found": "2026-11-03",
+    "module": "All lists with yes/no filters",
+    "layer": "Backend",
+    "severity": "Medium",
+    "title": "Yes/no filters in the URL treated \"false\" as true",
+    "steps": "GET /admin/payroll/salaries?has_structure=false",
+    "expected": "Only staff without a salary",
+    "actual": "Staff with a salary came back (12 instead of 1); the same pattern sat in 8 DTO files",
+    "status": "Fixed",
+    "fix": "One shared toBoolean helper in @app/common reads the raw query value before implicit conversion; used in every DTO; unit test added",
+    "retest": "Pass (has_structure=false → 1, true → 12; PY-01)"
   }
 ]

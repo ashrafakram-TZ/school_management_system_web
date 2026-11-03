@@ -48,6 +48,7 @@ export interface StudentDetail extends StudentListItem {
   city: string | null
   pincode: string | null
   previous_school: string | null
+  identification_marks: string | null
   guardian_details: (GuardianSummary & {
     email: string | null
     occupation: string | null
@@ -100,6 +101,7 @@ export interface StudentInput {
   city?: string | null
   pincode?: string | null
   previous_school?: string | null
+  identification_marks?: string | null
   admission_no?: string
   admission_date?: string
   class_id: number
@@ -187,6 +189,7 @@ export interface Admission {
   guardian_relation: Relation
   guardian_email: string | null
   previous_school: string | null
+  identification_marks: string | null
   notes: string | null
   decision_note: string | null
   decided_at: string | null
@@ -213,6 +216,7 @@ export interface AdmissionInput {
   guardian_relation: Relation
   guardian_email?: string | null
   previous_school?: string | null
+  identification_marks?: string | null
   notes?: string | null
 }
 

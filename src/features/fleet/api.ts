@@ -4,7 +4,8 @@ import { config } from '@/config/env'
 import { api, type Paginated } from '@/lib/api/client'
 
 export type VehicleState = 'moving' | 'idle' | 'parked' | 'offline' | 'no_data'
-export type VehicleAlert = 'low_fuel' | 'low_battery' | 'harsh_driving'
+export type VehicleAlert =
+  'low_fuel' | 'low_battery' | 'harsh_driving' | 'engine_fault' | 'engine_overheat'
 export type DrivingEvent = 'harsh_brake' | 'harsh_accel' | 'harsh_turn'
 
 export interface Position {
@@ -14,6 +15,19 @@ export interface Position {
   heading: number | null
   ignition: boolean | null
   recorded_at: string
+}
+
+export interface ObdSnapshot {
+  rpm: number | null
+  speed: number | null
+  coolant_c: number | null
+  engine_load_pct: number | null
+  throttle_pct: number | null
+  fuel_pct: number | null
+  battery_v: number | null
+  odometer_km: number | null
+  dtc: string[]
+  at: string
 }
 
 export interface Vehicle {
@@ -31,6 +45,7 @@ export interface Vehicle {
   harsh_today: { brake: number; accel: number; turn: number }
   alerts: VehicleAlert[]
   position: Position | null
+  obd?: ObdSnapshot | null
 }
 
 export interface FleetLive {
@@ -41,6 +56,7 @@ export interface FleetLive {
   offline: number
   harsh_events_today: number
   low_fuel: number
+  engine_faults?: number
   vehicles: Vehicle[]
 }
 
@@ -66,6 +82,8 @@ export const ALERT_LABELS: Record<VehicleAlert, string> = {
   low_fuel: 'Low fuel',
   low_battery: 'Low battery',
   harsh_driving: 'Harsh driving',
+  engine_fault: 'Engine fault',
+  engine_overheat: 'Engine overheating',
 }
 
 export const EVENT_LABELS: Record<DrivingEvent, string> = {

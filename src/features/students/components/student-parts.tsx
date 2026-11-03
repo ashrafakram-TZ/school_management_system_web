@@ -247,6 +247,7 @@ export function EditStudentModal({
     city: student.city ?? '',
     pincode: student.pincode ?? '',
     previous_school: student.previous_school ?? '',
+    identification_marks: student.identification_marks ?? '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const save = useStudentMutation(() =>
@@ -261,6 +262,7 @@ export function EditStudentModal({
       city: draft.city.trim() || null,
       pincode: draft.pincode.trim() || null,
       previous_school: draft.previous_school.trim() || null,
+      identification_marks: draft.identification_marks.trim() || null,
     })
   )
   const set = (field: keyof typeof draft, value: string) => {
@@ -408,6 +410,21 @@ export function EditStudentModal({
             id='edit-previous'
             value={draft.previous_school}
             onChange={(event) => set('previous_school', event.target.value)}
+          />
+        </FormField>
+        <FormField
+          id='edit-marks'
+          label='Identification marks'
+          hint='Birth marks, moles or scars. Printed on the TC.'
+          className='sm:col-span-2'
+          error={errors.identification_marks}
+        >
+          <Input
+            id='edit-marks'
+            maxLength={255}
+            placeholder='e.g. A mole on the left cheek, a scar on the right thumb'
+            value={draft.identification_marks}
+            onChange={(event) => set('identification_marks', event.target.value)}
           />
         </FormField>
       </form>

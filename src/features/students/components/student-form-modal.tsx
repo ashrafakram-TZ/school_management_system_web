@@ -36,6 +36,7 @@ interface Draft {
   city: string
   pincode: string
   previous_school: string
+  identification_marks: string
 }
 
 const emptyDraft = (): Draft => ({
@@ -53,6 +54,7 @@ const emptyDraft = (): Draft => ({
   city: '',
   pincode: '',
   previous_school: '',
+  identification_marks: '',
 })
 
 export function StudentFormModal({
@@ -145,6 +147,7 @@ function StudentForm({
         city: blank(draft.city),
         pincode: blank(draft.pincode),
         previous_school: blank(draft.previous_school),
+        identification_marks: blank(draft.identification_marks),
         guardians: guardians.map(({ key: _key, ...guardian }, index) => ({
           ...guardian,
           email: guardian.email || null,
@@ -312,6 +315,20 @@ function StudentForm({
               type='date'
               value={draft.admission_date}
               onChange={(event) => set('admission_date', event.target.value)}
+            />
+          </FormField>
+          <FormField
+            id='identification_marks'
+            label='Identification marks'
+            hint='Birth marks, moles or scars. Printed on the TC.'
+            className='sm:col-span-2'
+          >
+            <Input
+              id='identification_marks'
+              maxLength={255}
+              placeholder='e.g. A mole on the left cheek, a scar on the right thumb'
+              value={draft.identification_marks}
+              onChange={(event) => set('identification_marks', event.target.value)}
             />
           </FormField>
           <FormField id='address_line' label='Address' className='sm:col-span-2'>

@@ -109,7 +109,8 @@ export const setupKeys = {
   school: () => [...setupKeys.all, 'school'] as const,
   years: () => [...setupKeys.all, 'years'] as const,
   classes: () => [...setupKeys.all, 'classes'] as const,
-  sections: (classId?: number) => [...setupKeys.all, 'sections', classId ?? 'all'] as const,
+  sections: (classId?: number, yearId?: number) =>
+    [...setupKeys.all, 'sections', classId ?? 'all', yearId ?? 'current'] as const,
   subjects: (search?: string) => [...setupKeys.all, 'subjects', search ?? ''] as const,
   classSubjects: (classId: number) => [...setupKeys.all, 'class-subjects', classId] as const,
   holidays: () => [...setupKeys.all, 'holidays'] as const,
@@ -142,7 +143,8 @@ export const setupApi = {
     api.post<SchoolClass>('/admin/classes', input),
   standardClasses: () => api.post<SchoolClass[]>('/admin/classes/standard'),
   removeClass: (id: number) => api.delete<{ id: number }>(`/admin/classes/${id}`),
-  sections: (classId?: number) => api.get<Section[]>('/admin/sections', { class_id: classId }),
+  sections: (classId?: number, yearId?: number) =>
+    api.get<Section[]>('/admin/sections', { class_id: classId, academic_year_id: yearId }),
   createSection: (input: SectionInput) => api.post<Section>('/admin/sections', input),
   updateSection: (id: number, input: Partial<SectionInput>) =>
     api.patch<Section>(`/admin/sections/${id}`, input),
@@ -173,6 +175,7 @@ export interface SectionInput {
   room?: string | null
   capacity?: number
   class_teacher_user_id?: number | null
+  academic_year_id?: number
 }
 
 export interface HolidayInput {
@@ -203,10 +206,10 @@ export function useClasses(enabled = true) {
   })
 }
 
-export function useSections(classId?: number, enabled = true) {
+export function useSections(classId?: number, enabled = true, yearId?: number) {
   return useQuery({
-    queryKey: setupKeys.sections(classId),
-    queryFn: () => setupApi.sections(classId),
+    queryKey: setupKeys.sections(classId, yearId),
+    queryFn: () => setupApi.sections(classId, yearId),
     enabled,
     meta: { silent: true },
   })

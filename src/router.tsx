@@ -26,7 +26,10 @@ import {
   studentProfileSearchSchema,
   studentsSearchSchema,
 } from '@/features/students/search'
+import { payrollSearchSchema } from '@/features/payroll/search'
+import { substitutesSearchSchema } from '@/features/substitutes/search'
 import { timetableSearchSchema } from '@/features/timetable/search'
+import { transportSearchSchema } from '@/features/transport/search'
 import { usersSearchSchema } from '@/features/users/search'
 
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -175,6 +178,49 @@ const timetableRoute = createRoute({
   ),
 })
 
+const substitutesRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/substitutes',
+  validateSearch: substitutesSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/substitutes/pages/substitutes-page'),
+    'SubstitutesPage'
+  ),
+})
+
+const payrollRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/payroll',
+  validateSearch: payrollSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/payroll/pages/payroll-page'),
+    'PayrollPage'
+  ),
+})
+
+const transportRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/transport',
+  validateSearch: transportSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/transport/pages/transport-page'),
+    'TransportPage'
+  ),
+})
+
+const routeBuilderRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/transport/routes/$routeId',
+  params: {
+    parse: (raw) => ({ routeId: z.coerce.number().int().min(1).parse(raw.routeId) }),
+    stringify: (params) => ({ routeId: String(params.routeId) }),
+  },
+  component: lazyRouteComponent(
+    () => import('@/features/transport/pages/route-builder-page'),
+    'RouteBuilderPage'
+  ),
+})
+
 const setupRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/setup',
@@ -204,6 +250,10 @@ const routeTree = rootRoute.addChildren([
     staffProfileRoute,
     attendanceRoute,
     timetableRoute,
+    substitutesRoute,
+    payrollRoute,
+    transportRoute,
+    routeBuilderRoute,
     setupRoute,
     schoolsRoute,
     usersRoute,

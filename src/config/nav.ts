@@ -4,6 +4,9 @@ import {
   CalendarCheck,
   CalendarRange,
   ClipboardList,
+  Repeat,
+  Route,
+  Wallet,
   GraduationCap,
   Grid3x3,
   HeartHandshake,
@@ -25,6 +28,9 @@ export type NavPath =
   | '/staff/assignments'
   | '/attendance'
   | '/timetable'
+  | '/substitutes'
+  | '/payroll'
+  | '/transport'
   | '/notifications'
   | '/fleet'
   | '/setup'
@@ -122,6 +128,27 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: 'nav.timetable',
         permission: 'timetable.view',
       },
+      {
+        to: '/substitutes',
+        label: 'Substitutes',
+        description: 'Cover for absent teachers, period by period',
+        icon: Repeat,
+        shortcut: 'nav.substitutes',
+        permission: 'timetable.view',
+      },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      {
+        to: '/payroll',
+        label: 'Payroll',
+        description: 'Salaries, monthly payroll runs and payslips',
+        icon: Wallet,
+        shortcut: 'nav.payroll',
+        permission: 'payroll.view',
+      },
     ],
   },
   {
@@ -146,6 +173,14 @@ export const NAV_GROUPS: NavGroup[] = [
         description: 'Where every bus is and whether it is moving',
         icon: Truck,
         shortcut: 'nav.fleet',
+        permission: 'fleet.view',
+      },
+      {
+        to: '/transport',
+        label: 'Buses and routes',
+        description: 'Buses, drivers, routes, stops and students on each bus',
+        icon: Route,
+        shortcut: 'nav.transport',
         permission: 'fleet.view',
       },
     ],

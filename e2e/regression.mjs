@@ -5,7 +5,7 @@ import { chromium } from 'playwright-core'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5173'
 const CHROME = process.env.E2E_CHROME ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-const DAY = process.env.E2E_DAY ?? 'Day 4'
+const DAY = process.env.E2E_DAY ?? 'Day 5'
 const ROOT = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
 const OUT = path.join(ROOT, 'results')
 const SHOTS = path.join(OUT, 'screenshots')
@@ -1336,6 +1336,256 @@ await D4(
   }
 )
 
+await D4(
+  {
+    id: 'ST-21',
+    module: 'Students',
+    type: 'View',
+    title: 'Add student form has Identification marks',
+    steps: 'Students, Add student.',
+    expected: 'Identification marks field with the TC hint',
+  },
+  async () => {
+    await go('/students')
+    await click(page, /^Add student/)
+    await dialog().getByLabel('Identification marks').waitFor({ timeout: 8000 })
+    await see('Printed on the TC', dialog())
+  }
+)
+await D4(
+  {
+    id: 'PR-01',
+    module: 'Promotion',
+    type: 'Add',
+    title: 'Promote offers to add next year sections when there are none',
+    steps: 'Students, Bulk actions, Promote to next year, Class UKG → Class 1.',
+    expected: 'Section hint is a button "Add … for <next year>" instead of a dead end',
+  },
+  async () => {
+    await go('/students')
+    await click(page, /Bulk actions/)
+    await page.getByRole('menuitem', { name: /Promote/ }).first().click()
+    await pick(dialog(), 'Class this year', /^Class UKG/)
+    await dialog().getByRole('button', { name: /^Add .+ for \d{4}-\d{2}$/ }).waitFor({ timeout: 8000 })
+  }
+)
+
+const D5 = (meta, fn) => test({ ...meta, day: 'Day 5' }, fn)
+const nextSchoolDay5 = (() => {
+  for (let offset = 1; ; offset += 1) {
+    const date = new Date(Date.now() + 5.5 * 3600 * 1000 + offset * 86400000).toISOString().slice(0, 10)
+    if (new Date(`${date}T00:00:00Z`).getUTCDay() !== 0) return date
+  }
+})()
+
+await D5(
+  {
+    id: 'SB-01',
+    module: 'Substitutes',
+    type: 'View',
+    title: 'Substitutes board shows the teacher on leave and their periods',
+    steps: `Open Substitutes for ${nextSchoolDay5}.`,
+    expected: 'Insight cards and a card for the teacher on Casual leave',
+  },
+  async () => {
+    await go(`/substitutes?date=${nextSchoolDay5}`)
+    await see('Teachers away')
+    await see('Casual leave')
+  }
+)
+await D5(
+  {
+    id: 'SB-02',
+    module: 'Substitutes',
+    type: 'Validation',
+    title: 'Assigning needs a teacher',
+    steps: 'Click Assign on a period, then Assign substitute without choosing.',
+    expected: '"Choose a teacher to take this period"',
+  },
+  async () => {
+    await page.getByRole('button', { name: /^Assign a substitute for period/ }).first().click()
+    await click(dialog(), 'Assign substitute')
+    await see('Choose a teacher to take this period', dialog())
+  }
+)
+await D5(
+  {
+    id: 'SB-03',
+    module: 'Substitutes',
+    type: 'Add',
+    title: 'Assign the best free teacher, then remove',
+    steps: 'Assign, pick the first free teacher, Assign substitute; then Remove.',
+    expected: 'Toast "… will take period …", then "… removed from period …"',
+  },
+  async () => {
+    await page.getByRole('button', { name: /^Assign a substitute for period/ }).first().click()
+    await dialog().getByRole('radio').first().click()
+    await click(dialog(), 'Assign substitute')
+    await see(/will take period/)
+    await page.getByRole('button', { name: /^Remove .+ from period/ }).first().click()
+    const confirm = page.getByRole('alertdialog')
+    if (await confirm.count()) await confirm.getByRole('button', { name: /Remove/ }).last().click()
+    await see(/removed from period/)
+  }
+)
+await D5(
+  {
+    id: 'PY-01',
+    module: 'Payroll',
+    type: 'Validation',
+    title: 'Salary needs a basic pay',
+    steps: 'Payroll, Salaries, No salary filter, Set salary, Save salary with basic empty.',
+    expected: '"Enter the basic pay"',
+  },
+  async () => {
+    await go('/payroll?tab=salaries&salary=missing')
+    await see('Not set')
+    await page.getByRole('button', { name: /^Set salary for/ }).first().click()
+    await click(dialog(), 'Save salary')
+    await see('Enter the basic pay', dialog())
+  }
+)
+await D5(
+  {
+    id: 'PY-02',
+    module: 'Payroll',
+    type: 'Add',
+    title: 'Run payroll for October 2026 as a draft, then delete it',
+    steps: 'Payroll runs, Month October 2026, Run payroll; then Delete draft.',
+    expected: 'Draft run opens with payslips; deleting shows "Draft payroll deleted"',
+  },
+  async () => {
+    await go('/payroll?tab=runs')
+    await pick(page, 'Month', 'October 2026')
+    await click(page, 'Run payroll')
+    await see('October 2026 payroll')
+    await see('Payslips')
+    await click(page, 'Delete draft')
+    const confirm = page.getByRole('alertdialog').or(page.getByRole('dialog'))
+    await confirm.getByRole('button', { name: 'Delete draft' }).last().click()
+    await see('Draft payroll deleted')
+  }
+)
+await D5(
+  {
+    id: 'PY-03',
+    module: 'Payroll',
+    type: 'View',
+    title: 'Final September run shows payslips with a PDF button',
+    steps: 'Payroll runs, open September 2026.',
+    expected: 'Final badge, payslip table and PDF buttons',
+  },
+  async () => {
+    await go('/payroll?tab=runs')
+    await page.getByRole('row', { name: /September 2026/ }).first().click()
+    await see('September 2026 payroll')
+    await page.getByRole('button', { name: /^Payslip PDF for/ }).first().waitFor({ timeout: 8000 })
+  }
+)
+
+await D5(
+  {
+    id: 'TR-01',
+    module: 'Transport',
+    type: 'View',
+    title: 'Buses list shows documents worst first',
+    steps: 'Open Buses and routes.',
+    expected: 'Both demo buses with expiry badges such as "Fitness Expired"',
+  },
+  async () => {
+    await go('/transport?tab=buses')
+    await see('TN 09 AB 1234')
+    await see('Expired')
+  }
+)
+await D5(
+  {
+    id: 'TR-02',
+    module: 'Transport',
+    type: 'Validation',
+    title: 'Add bus with nothing filled',
+    steps: 'Add bus, Add bus with empty fields.',
+    expected: 'Registration, name and seats messages',
+  },
+  async () => {
+    await click(page, 'Add bus')
+    await dialog().getByLabel('Seats').fill('')
+    await dialog().getByRole('button', { name: 'Add bus' }).click()
+    await see('Enter the registration like TN 09 AB 1234', dialog())
+    await see('Enter a short name, like Bus 1', dialog())
+  }
+)
+await D5(
+  {
+    id: 'TR-03',
+    module: 'Transport',
+    type: 'Validation',
+    title: 'Same registration twice is refused',
+    steps: 'Add bus TN 09 AB 1234 again.',
+    expected: '"TN 09 AB 1234 is already added" under the registration',
+  },
+  async () => {
+    await click(page, 'Add bus')
+    await fill(dialog(), 'Registration number', 'TN 09 AB 1234')
+    await fill(dialog(), 'Bus name', 'Copy')
+    await dialog().getByRole('button', { name: 'Add bus' }).click()
+    await see('TN 09 AB 1234 is already added', dialog())
+  }
+)
+await D5(
+  {
+    id: 'TR-04',
+    module: 'Transport',
+    type: 'View',
+    title: 'Route builder draws the route on the map',
+    steps: 'Routes, Open builder on R1.',
+    expected: 'Map with numbered stop pins, school pin and the stop list',
+  },
+  async () => {
+    await go('/transport?tab=routes')
+    await page.getByRole('row', { name: /R1/ }).getByRole('link', { name: 'Open builder' }).or(page.getByRole('row', { name: /R1/ }).getByRole('button', { name: 'Open builder' })).first().click()
+    await page.getByLabel('Route map').waitFor({ timeout: 8000 })
+    await page.getByLabel(/^Stop 1: /).first().waitFor({ timeout: 8000 })
+    await page.getByLabel('Stops in travel order').waitFor()
+    await see('All changes saved')
+  }
+)
+await D5(
+  {
+    id: 'TR-05',
+    module: 'Transport',
+    type: 'Validation',
+    title: 'A new stop needs a name',
+    steps: 'Click the map, then Add stop with no name.',
+    expected: '"Enter the stop name"; nothing saved',
+    keepOpen: true,
+  },
+  async () => {
+    const map = page.getByLabel('Route map')
+    const box = await map.boundingBox()
+    await page.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.7)
+    await dialog().getByRole('button', { name: 'Add stop' }).click()
+    await see('Enter the stop name', dialog())
+    await page.keyboard.press('Escape')
+  }
+)
+await D5(
+  {
+    id: 'TR-06',
+    module: 'Transport',
+    type: 'View',
+    title: 'Students on the bus list loads with filters',
+    steps: 'Students tab, filter by route R1.',
+    expected: 'Rows with route, stop and fee',
+  },
+  async () => {
+    await go('/transport?tab=students')
+    await see('Fee a month')
+    await pick(page, 'Filter by route', /R1/)
+    await see('Mogappair')
+  }
+)
+
 {
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -1349,6 +1599,9 @@ await D4(
     ['RS-03', `${studentUrl || '/students'}`, /Profile|Students/],
     ['RS-04', '/attendance', 'Sections not marked'],
     ['RS-05', '/timetable', 'Subject plan'],
+    ['RS-06', '/substitutes', 'Teachers away'],
+    ['RS-07', '/payroll', 'Payroll runs'],
+    ['RS-08', '/transport', 'Buses and routes'],
   ]) {
     await test(
       {
