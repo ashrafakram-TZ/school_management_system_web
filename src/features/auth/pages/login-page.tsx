@@ -49,6 +49,8 @@ const ERROR_TITLES: Record<string, string> = {
   MOBILE_NOT_REGISTERED: 'Number not registered',
   ACCOUNT_INACTIVE: 'Account switched off',
   NO_ADMIN_ACCESS: 'No admin access',
+  APP_NOT_ALLOWED: 'No admin access',
+  AUTH_SERVICE_UNAVAILABLE: 'Sign-in is busy',
   OTP_INVALID: 'Wrong code',
   OTP_EXPIRED: 'Code expired',
   OTP_ATTEMPTS_EXCEEDED: 'Too many attempts',

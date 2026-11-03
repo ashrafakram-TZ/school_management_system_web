@@ -46,7 +46,7 @@ export interface LoginResponse {
 export const meKey = ['me'] as const
 
 export const authApi = {
-  requestOtp: (mobile: string) => api.post<OtpSent>('/auth/otp/request', { mobile }),
+  requestOtp: (mobile: string) => api.post<OtpSent>('/auth/otp/request', { mobile, app: 'admin' }),
   verifyOtp: (mobile: string, otp: string) =>
     api.post<LoginResponse>('/auth/otp/verify', {
       mobile,

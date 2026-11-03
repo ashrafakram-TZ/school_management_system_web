@@ -42,7 +42,7 @@ function saveSession(stateFile, tokens) {
   fs.writeFileSync(file, JSON.stringify(state, null, 2))
 }
 
-async function sessionFor(stateFile, mobileNumber) {
+async function sessionFor(stateFile, mobileNumber, app = 'admin') {
   const saved = tokenFrom(stateFile)
   if (saved) {
     const refreshed = await fetch(`${API}/auth/refresh`, {
@@ -66,7 +66,7 @@ async function sessionFor(stateFile, mobileNumber) {
     body: JSON.stringify({
       mobile: mobileNumber,
       otp: '123456',
-      client: { app: 'admin', platform: 'web' },
+      client: { app, platform: app === 'admin' ? 'web' : 'android' },
     }),
   }).then((response) => response.json())
   if (!verified.data) throw new Error(`Sign-in failed for ${mobileNumber}: ${verified.message}`)
@@ -129,8 +129,8 @@ const expectFields = (result, wanted) => {
 const adminToken = await sessionFor('.auth-admin.json', '9876543210')
 const admin = client(adminToken)
 const guest = client(null)
-const parent = client(await sessionFor('.auth-parent.json', '9000000005'))
-const teacherToken = await sessionFor('.auth-teacher.json', '9000000004')
+const parent = client(await sessionFor('.auth-parent.json', '9000000005', 'mobile'))
+const teacherToken = await sessionFor('.auth-teacher.json', '9000000004', 'mobile')
 const teacher = client(teacherToken)
 
 const C = (id, module, method, endpoint, scenario, expected, fn) =>
@@ -1653,6 +1653,59 @@ await D5(
       expectStatus(await admin('GET', `/admin/transport/students${query}`), 200)
     }
     return '200 for default sort, search and page 2'
+  }
+)
+
+await check(
+  {
+    id: 'API-AU-05',
+    module: 'Auth',
+    method: 'POST',
+    endpoint: '/auth/otp/request',
+    scenario: 'Super admin asks for an OTP in the mobile app',
+    expected: '403 APP_NOT_ALLOWED, no SMS sent',
+    day: 'Day 5',
+  },
+  async () =>
+    expectStatus(
+      await guest('POST', '/auth/otp/request', { mobile: '9999999999', app: 'mobile' }),
+      403,
+      'APP_NOT_ALLOWED'
+    )
+)
+await check(
+  {
+    id: 'API-AU-06',
+    module: 'Auth',
+    method: 'POST',
+    endpoint: '/auth/otp/request',
+    scenario: 'Parent asks for an OTP on the admin web',
+    expected: '403 APP_NOT_ALLOWED, no SMS sent',
+    day: 'Day 5',
+  },
+  async () =>
+    expectStatus(
+      await guest('POST', '/auth/otp/request', { mobile: '9000000005', app: 'admin' }),
+      403,
+      'APP_NOT_ALLOWED'
+    )
+)
+await check(
+  {
+    id: 'API-AU-07',
+    module: 'Auth',
+    method: 'GET',
+    endpoint: '/me',
+    scenario: 'Profile lists the sections for the role switcher',
+    expected: '200 with mobile_apps and sections (label and roles)',
+    day: 'Day 5',
+  },
+  async () => {
+    const me = (await parent('GET', '/me')).body.data
+    if (!me.mobile_apps?.includes('parent')) throw new Error(`mobile_apps is ${JSON.stringify(me.mobile_apps)}`)
+    const section = me.sections.find((item) => item.app === 'parent')
+    if (!section?.roles.length) throw new Error('No Parent section with roles')
+    return `200, mobile_apps ${JSON.stringify(me.mobile_apps)}, sections ${me.sections.map((item) => item.label).join(', ')}`
   }
 )
 
