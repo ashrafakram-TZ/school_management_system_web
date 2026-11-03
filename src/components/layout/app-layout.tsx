@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { useTheme } from '@/providers/theme-context'
 import { AppHeader } from './app-header'
 import { AppSidebar } from './app-sidebar'
+import { SchoolGate } from './school-gate'
 
 const COLLAPSED_KEY = 'tz-sidebar-collapsed'
 
@@ -154,7 +155,9 @@ export function AppLayout() {
           onToggleSidebar={toggleCollapsed}
           onOpenMobile={() => setMobileOpen(true)}
         />
-        <Outlet />
+        <SchoolGate me={me.data}>
+          <Outlet />
+        </SchoolGate>
       </div>
     </div>
   )

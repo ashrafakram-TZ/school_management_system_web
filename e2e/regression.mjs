@@ -1231,7 +1231,7 @@ await D4(
     expected: 'The waiting request shows "Waiting for principal"',
   },
   async () => {
-    await go('/attendance?tab=leave&leave=staff')
+    await go('/attendance?tab=leave&leave=staff&status=pending_principal')
     await see('Waiting for principal')
   }
 )
@@ -1393,18 +1393,26 @@ await D5(
     await see('Casual leave')
   }
 )
+const aoSubContext = await browser.newContext({
+  viewport: { width: 1440, height: 900 },
+  storageState: path.join(ROOT, '.auth-ao.json'),
+})
+const adminPage = page
+page = await aoSubContext.newPage()
+await go(`/substitutes?date=${nextSchoolDay5}`)
+await see('Teachers away')
 await D5(
   {
     id: 'SB-02',
     module: 'Substitutes',
     type: 'Validation',
     title: 'Assigning needs a teacher',
-    steps: 'Click Assign on a period, then Assign substitute without choosing.',
+    steps: 'As the AO, click Assign on a period, then Assign substitute without choosing.',
     expected: '"Choose a teacher to take this period"',
   },
   async () => {
-    await page.getByRole('button', { name: /^Assign a substitute for period/ }).first().click()
-    await click(dialog(), 'Assign substitute')
+    await page.getByRole('button', { name: /^Assign a proxy for period/ }).first().click()
+    await click(dialog(), 'Assign proxy')
     await see('Choose a teacher to take this period', dialog())
   }
 )
@@ -1414,13 +1422,13 @@ await D5(
     module: 'Substitutes',
     type: 'Add',
     title: 'Assign the best free teacher, then remove',
-    steps: 'Assign, pick the first free teacher, Assign substitute; then Remove.',
+    steps: 'As the AO, Assign, pick the first free teacher, Assign substitute; then Remove.',
     expected: 'Toast "… will take period …", then "… removed from period …"',
   },
   async () => {
-    await page.getByRole('button', { name: /^Assign a substitute for period/ }).first().click()
+    await page.getByRole('button', { name: /^Assign a proxy for period/ }).first().click()
     await dialog().getByRole('radio').first().click()
-    await click(dialog(), 'Assign substitute')
+    await click(dialog(), 'Assign proxy')
     await see(/will take period/)
     await page.getByRole('button', { name: /^Remove .+ from period/ }).first().click()
     const confirm = page.getByRole('alertdialog')
@@ -1428,6 +1436,8 @@ await D5(
     await see(/removed from period/)
   }
 )
+await aoSubContext.close()
+page = adminPage
 await D5(
   {
     id: 'PY-01',
@@ -1825,6 +1835,114 @@ await TA(
   }
 )
 
+await TA(
+  {
+    id: 'SL-01',
+    module: 'School logo',
+    type: 'View',
+    title: 'School profile has a logo upload',
+    steps: 'School setup, School profile.',
+    expected: '"School logo" with Upload or Change logo',
+  },
+  async () => {
+    await go('/setup?tab=profile')
+    await see('School logo')
+    await page.getByText(/Upload logo|Change logo/).first().waitFor({ timeout: 8000 })
+  }
+)
+await TA(
+  {
+    id: 'SB-04',
+    module: 'Substitutes',
+    type: 'View',
+    title: 'School admin sees that only the AO assigns substitutes',
+    steps: 'Open Substitutes as the school admin.',
+    expected: 'Notice "Only the Administrative officer (AO) or the super admin assigns proxies"',
+  },
+  async () => {
+    await go('/substitutes')
+    const sunday = new Date(Date.now() + 5.5 * 3600 * 1000).getUTCDay() === 0
+    if (sunday) return
+    await see('Only the Administrative officer (AO) or the super admin assigns proxies')
+  }
+)
+{
+  const aoContext = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    storageState: path.join(ROOT, '.auth-ao.json'),
+  })
+  const previous = page
+  page = await aoContext.newPage()
+  await TA(
+    {
+      id: 'AO-01',
+      module: 'AO access',
+      type: 'View',
+      title: 'AO menu hides payroll and users',
+      steps: 'Sign in as the AO and open the dashboard.',
+      expected: 'Students, Substitutes and Fees in the menu; no Payroll or Users & access',
+    },
+    async () => {
+      await go('/')
+      const nav = page.getByRole('navigation').first()
+      await nav.getByRole('link', { name: 'Proxy' }).waitFor({ timeout: 10000 })
+      await nav.getByRole('link', { name: 'Fees' }).waitFor()
+      if (await nav.getByRole('link', { name: 'Payroll' }).count()) throw new Error('Payroll is shown')
+      if (await nav.getByRole('link', { name: /Users/ }).count()) throw new Error('Users & access is shown')
+    }
+  )
+  await TA(
+    {
+      id: 'AO-02',
+      module: 'Substitutes',
+      type: 'View',
+      title: 'AO can assign substitutes',
+      steps: 'Open Substitutes as the AO.',
+      expected: 'No "only the AO" notice',
+    },
+    async () => {
+      await go('/substitutes')
+      await see('Teachers away')
+      await page.waitForTimeout(800)
+      if (await page.getByText('Only the Administrative officer (AO) or the super admin assigns proxies').count())
+        throw new Error('AO is told it cannot assign')
+    }
+  )
+  await aoContext.close()
+  page = previous
+}
+{
+  const state = JSON.parse(fs.readFileSync(path.join(ROOT, '.auth-super.json'), 'utf8'))
+  for (const origin of state.origins)
+    origin.localStorage = origin.localStorage.filter((item) => item.name !== 'tz-school-id')
+  const fresh = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: state })
+  const previous = page
+  page = await fresh.newPage()
+  await TA(
+    {
+      id: 'SG-01',
+      module: 'Super admin',
+      type: 'View',
+      title: 'Super admin sign-in opens a school without "Choose a school first" errors',
+      steps: 'Open the dashboard as the super admin with no school picked yet.',
+      expected: 'First school picked automatically, no SCHOOL_REQUIRED calls or toasts',
+    },
+    async () => {
+      const failed = []
+      page.on('response', (response) => {
+        if (response.status() === 400 && response.url().includes('/api/v1/')) failed.push(response.url())
+      })
+      await go('/')
+      await page.waitForTimeout(1500)
+      if (await page.getByText('Choose a school first').count()) throw new Error('Toast shown')
+      if (failed.length) throw new Error(`400 from ${failed.join(', ')}`)
+      const school = await page.evaluate(() => localStorage.getItem('tz-school-id'))
+      if (!school) throw new Error('No school picked')
+    }
+  )
+  await fresh.close()
+  page = previous
+}
 {
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },

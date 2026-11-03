@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Combobox } from '@/components/common/combobox'
 import { useSchoolOptions } from '@/features/schools/api'
@@ -8,16 +7,7 @@ export function SchoolSwitcher() {
   const queryClient = useQueryClient()
   const selected = useSelectedSchool()
   const schools = useSchoolOptions(true)
-  const loaded = schools.data?.items
-  const items = loaded ?? []
-
-  useEffect(() => {
-    if (!loaded?.length) return
-    if (!selected || !loaded.some((school) => school.id === selected)) {
-      schoolContext.set(loaded[0].id)
-      void queryClient.invalidateQueries()
-    }
-  }, [loaded, selected, queryClient])
+  const items = schools.data?.items ?? []
 
   return (
     <div className='grid gap-1'>

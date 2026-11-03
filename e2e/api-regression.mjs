@@ -132,6 +132,7 @@ const guest = client(null)
 const parent = client(await sessionFor('.auth-parent.json', '9000000005', 'mobile'))
 const teacherToken = await sessionFor('.auth-teacher.json', '9000000004', 'mobile')
 const teacher = client(teacherToken)
+const ao = client(await sessionFor('.auth-ao.json', '9000000002'))
 
 const C = (id, module, method, endpoint, scenario, expected, fn) =>
   check({ id, module, method, endpoint, scenario, expected }, fn)
@@ -1354,7 +1355,7 @@ await D5(
   '/admin/substitutes',
   'Assign with nothing filled',
   '400 VALIDATION_FAILED on date, slot_id, substitute_user_id',
-  async () => expectFields(await admin('POST', '/admin/substitutes', {}), ['date', 'slot_id', 'substitute_user_id'])
+  async () => expectFields(await ao('POST', '/admin/substitutes', {}), ['date', 'slot_id', 'substitute_user_id'])
 )
 await D5(
   'API-SB-03',
@@ -1365,7 +1366,7 @@ await D5(
   '400 VALIDATION_FAILED on date',
   async () =>
     expectFields(
-      await admin('POST', '/admin/substitutes', { date: istDate(-7), slot_id: 1, substitute_user_id: 1 }),
+      await ao('POST', '/admin/substitutes', { date: istDate(-7), slot_id: 1, substitute_user_id: 1 }),
       ['date']
     )
 )
@@ -1378,7 +1379,7 @@ await D5(
   '201, period covered, teacher gets SUBSTITUTE_ASSIGNED',
   async () => {
     if (!coverPeriod) return 'Skipped: no period where the demo teacher is free'
-    const result = await admin('POST', '/admin/substitutes', {
+    const result = await ao('POST', '/admin/substitutes', {
       date: nextSchoolDay,
       slot_id: coverPeriod.slot_id,
       substitute_user_id: teacherMe.id,
@@ -1418,7 +1419,7 @@ await D5(
   '200 and the period is uncovered',
   async () => {
     if (!substitutionId) return 'Skipped: nothing assigned'
-    const result = await admin('DELETE', `/admin/substitutes/${substitutionId}`)
+    const result = await ao('DELETE', `/admin/substitutes/${substitutionId}`)
     expectStatus(result, 200)
     const period = result.body.data.teachers.flatMap((row) => row.periods).find((row) => row.slot_id === coverPeriod.slot_id)
     if (period?.substitute) throw new Error('Still covered')
@@ -2001,6 +2002,88 @@ await TA(
     if (!rosterStudent) return 'Skipped: teacher has no section'
     if (!('fee' in rosterStudent)) throw new Error('fee key missing')
     return `200, first fee: ${JSON.stringify(rosterStudent.fee).slice(0, 60)}`
+  }
+)
+
+const AO = (id, module, method, endpoint, scenario, expected, fn) =>
+  check({ id, module, method, endpoint, scenario, expected, day: 'AO and logo' }, fn)
+await AO(
+  'API-AO-01',
+  'AO access',
+  'GET',
+  '/me',
+  'AO signs in to the admin web',
+  '200, admin app, substitutes.manage, no payroll or users.manage',
+  async () => {
+    const me = (await ao('GET', '/me')).body.data
+    if (!me.apps.includes('admin')) throw new Error(`apps ${me.apps}`)
+    if (!me.permissions.includes('substitutes.manage')) throw new Error('No substitutes.manage')
+    for (const code of ['payroll.view', 'users.manage', 'staff.bank', 'schools.manage'])
+      if (me.permissions.includes(code)) throw new Error(`AO has ${code}`)
+    return `200, ${me.permissions.length} permissions`
+  }
+)
+await AO(
+  'API-AO-02',
+  'AO access',
+  'GET',
+  '/admin/payroll/runs',
+  'AO opens payroll',
+  '403 FORBIDDEN',
+  async () => expectStatus(await ao('GET', '/admin/payroll/runs'), 403, 'FORBIDDEN')
+)
+await AO(
+  'API-AO-03',
+  'AO access',
+  'PATCH',
+  '/admin/school',
+  'AO edits school setup',
+  '403 FORBIDDEN',
+  async () => expectStatus(await ao('PATCH', '/admin/school', { name: 'x' }), 403, 'FORBIDDEN')
+)
+await AO(
+  'API-AO-04',
+  'Substitutes',
+  'POST',
+  '/admin/substitutes',
+  'School admin tries to assign a substitute',
+  '403 FORBIDDEN (only the AO assigns)',
+  async () =>
+    expectStatus(
+      await admin('POST', '/admin/substitutes', { date: TODAY_IST, slot_id: 1, substitute_user_id: 1 }),
+      403,
+      'FORBIDDEN'
+    )
+)
+await AO(
+  'API-AO-05',
+  'Substitutes',
+  'POST',
+  '/admin/substitutes',
+  'AO assigns with nothing filled',
+  '400 VALIDATION_FAILED (allowed, checked)',
+  async () => expectStatus(await ao('POST', '/admin/substitutes', {}), 400, 'VALIDATION_FAILED')
+)
+await AO(
+  'API-AO-06',
+  'School logo',
+  'PATCH',
+  '/admin/school',
+  'Logo pointing at a file that does not exist',
+  '400 VALIDATION_FAILED on logo_file_id',
+  async () => expectFields(await admin('PATCH', '/admin/school', { logo_file_id: 999999 }), ['logo_file_id'])
+)
+await AO(
+  'API-AO-07',
+  'School logo',
+  'GET',
+  '/me',
+  'Profile carries the school logo link',
+  '200 with school.logo_url (null when none)',
+  async () => {
+    const me = (await admin('GET', '/me')).body.data
+    if (!('logo_url' in me.school)) throw new Error('school.logo_url missing')
+    return `200, logo_url ${me.school.logo_url ? 'set' : 'null'}`
   }
 )
 

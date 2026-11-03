@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Save } from 'lucide-react'
+import { ImageUp, Save, Trash2 } from 'lucide-react'
 import { Combobox } from '@/components/common/combobox'
 import { ErrorState } from '@/components/common/display'
 import { FormField } from '@/components/common/form-field'
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { alerts } from '@/lib/alerts'
+import { toApiError } from '@/lib/api/errors'
+import { filesApi } from '@/lib/files'
 import { setupApi, useSchoolProfile, useSetupMutation, type SchoolProfile } from '../api'
 import { fieldErrorsOf } from '../form-actions'
 import { RootError, Section } from './setup-shared'
@@ -98,6 +100,7 @@ function ProfileForm({ school, canManage }: { school: SchoolProfile; canManage: 
     >
       <form noValidate onSubmit={submit} className='grid gap-4 sm:grid-cols-2'>
         <RootError message={errors.root} />
+        <SchoolLogo school={school} canManage={canManage} />
         {field('name', 'School name')}
         <FormField id='school-board' label='Board'>
           <Combobox
@@ -146,5 +149,97 @@ function ProfileForm({ school, canManage }: { school: SchoolProfile; canManage: 
         )}
       </form>
     </Section>
+  )
+}
+
+const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+
+function SchoolLogo({ school, canManage }: { school: SchoolProfile; canManage: boolean }) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const save = useSetupMutation((logo_file_id: number | null) =>
+    setupApi.updateSchool({ logo_file_id })
+  )
+
+  const upload = async (file: File | undefined) => {
+    if (!file) return
+    setError('')
+    if (!LOGO_TYPES.includes(file.type)) return setError('Choose a PNG, JPG or WEBP image')
+    if (file.size > 2 * 1024 * 1024) return setError('The logo must be 2 MB or smaller')
+    setUploading(true)
+    try {
+      const uploaded = await filesApi.upload(file, 'school_logo')
+      await save.mutateAsync(uploaded.id)
+      alerts.success('School logo saved')
+    } catch (caught) {
+      setError(toApiError(caught).message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <FormField
+      id='school-logo'
+      label='School logo'
+      error={error}
+      hint='Square PNG or JPG, up to 2 MB. Shown in the apps, ID cards, fee receipts, payslips and TCs.'
+      className='sm:col-span-2'
+    >
+      <div className='flex flex-wrap items-center gap-4'>
+        <div className='grid size-20 shrink-0 place-items-center overflow-hidden rounded-xl border bg-white'>
+          {school.logo_url ? (
+            <img
+              src={school.logo_url}
+              alt={`${school.name} logo`}
+              className='size-full object-contain p-1'
+            />
+          ) : (
+            <ImageUp className='size-7 text-muted-foreground' aria-hidden />
+          )}
+        </div>
+        {canManage && (
+          <div className='flex flex-wrap gap-2'>
+            <Button asChild variant='outline' size='sm' disabled={uploading}>
+              <label htmlFor='school-logo' className='cursor-pointer'>
+                <ImageUp />
+                {uploading ? 'Uploading…' : school.logo_url ? 'Change logo' : 'Upload logo'}
+                <input
+                  id='school-logo'
+                  type='file'
+                  accept={LOGO_TYPES.join(',')}
+                  className='sr-only'
+                  disabled={uploading}
+                  onChange={(event) => {
+                    void upload(event.target.files?.[0])
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+            </Button>
+            {school.logo_url && (
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                className='text-destructive hover:bg-destructive/10'
+                loading={save.isPending && !uploading}
+                onClick={async () => {
+                  try {
+                    await save.mutateAsync(null)
+                    alerts.success('School logo removed')
+                  } catch (caught) {
+                    setError(toApiError(caught).message)
+                  }
+                }}
+              >
+                <Trash2 />
+                Remove
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </FormField>
   )
 }

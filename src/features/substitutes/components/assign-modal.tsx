@@ -60,7 +60,7 @@ function TeacherOption({
           {item.knows_section && <Badge tone='info'>Knows class</Badge>}
           <Badge tone='neutral'>{countText(item.periods_today, 'period', 'periods')} today</Badge>
           <Badge tone={item.substitutions_this_week ? 'warning' : 'neutral'}>
-            {countText(item.substitutions_this_week, 'cover', 'covers')} this week
+            {countText(item.substitutions_this_week, 'proxy', 'proxies')} this week
           </Badge>
         </span>
       </span>
@@ -90,10 +90,10 @@ export function AssignModal({
     <AppModal
       open
       onOpenChange={(open) => !open && onClose()}
-      title='Assign a substitute'
+      title='Assign a proxy'
       description={`${teacherName} is away · ${periodSummary(period)}`}
       formId='assign-substitute-form'
-      submitText='Assign substitute'
+      submitText='Assign proxy'
       loading={save.isPending}
       size='lg'
     >
@@ -116,7 +116,7 @@ export function AssignModal({
               note: note.trim() || null,
             })
             const name = teachers.find((item) => item.teacher.id === selected)?.teacher.name
-            alerts.success(`${name ?? 'Substitute'} will take period ${period.period_no}`)
+            alerts.success(`${name ?? 'Proxy'} will take period ${period.period_no}`)
             onClose()
           } catch (error) {
             const fields = fieldErrorsOf(error)
@@ -172,7 +172,7 @@ export function AssignModal({
         </FormField>
         <FormField
           id='substitute-note'
-          label='Note for the substitute'
+          label='Note for the proxy teacher'
           error={errors.note}
           hint='Optional. Shown to the teacher in the Staff app.'
         >

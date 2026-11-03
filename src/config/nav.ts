@@ -134,7 +134,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         to: '/substitutes',
-        label: 'Substitutes',
+        label: 'Proxy',
         description: 'Cover for absent teachers, period by period',
         icon: Repeat,
         shortcut: 'nav.substitutes',

@@ -13,7 +13,7 @@ export const SHORTCUTS = {
   'nav.assignments': { combo: 'g e', label: 'Go to teacher assignments', group: 'Navigation' },
   'nav.attendance': { combo: 'g r', label: 'Go to attendance', group: 'Navigation' },
   'nav.timetable': { combo: 'g w', label: 'Go to timetable', group: 'Navigation' },
-  'nav.substitutes': { combo: 'g v', label: 'Go to substitutes', group: 'Navigation' },
+  'nav.substitutes': { combo: 'g v', label: 'Go to proxy', group: 'Navigation' },
   'nav.payroll': { combo: 'g y', label: 'Go to payroll', group: 'Navigation' },
   'nav.fees': { combo: 'g f', label: 'Go to fees', group: 'Navigation' },
   'nav.exams': { combo: 'g x', label: 'Go to exams', group: 'Navigation' },

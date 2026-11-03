@@ -70,7 +70,7 @@ export function TeacherCard({
                   <>
                     <span className='grid min-w-0 sm:text-right'>
                       <span className='text-[11px] font-bold tracking-wider text-muted-foreground uppercase'>
-                        Substitute
+                        Proxy
                       </span>
                       <span className='truncate font-semibold text-success'>
                         {period.substitute.name}
@@ -101,7 +101,7 @@ export function TeacherCard({
                     {editable && (
                       <Button
                         size='sm'
-                        aria-label={`Assign a substitute for period ${period.period_no}`}
+                        aria-label={`Assign a proxy for period ${period.period_no}`}
                         onClick={() => onAssign(period)}
                       >
                         <UserRoundPlus />

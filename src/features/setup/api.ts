@@ -96,6 +96,8 @@ export interface SchoolProfile {
   latitude: number | null
   longitude: number | null
   geofence_radius_m: number
+  logo_file_id: number | null
+  logo_url: string | null
   timezone: string
   is_active: boolean
   student_count: number
@@ -246,6 +248,7 @@ export function useSetupMutation<TInput, TResult>(fn: (input: TInput) => Promise
     meta: { silent: true },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: setupKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ['me'] })
       void queryClient.invalidateQueries({ queryKey: ['students'] })
     },
   })

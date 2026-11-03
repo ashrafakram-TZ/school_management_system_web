@@ -66,11 +66,20 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
         ) : (
           me.school && (
             <div className={cn('shrink-0 px-4 pt-3', collapsed && 'md:hidden')}>
-              <div className='rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2'>
-                <div className='truncate text-xs font-bold text-sidebar-accent-foreground'>
-                  {me.school.name}
+              <div className='flex items-center gap-2.5 rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2'>
+                {me.school.logo_url && (
+                  <img
+                    src={me.school.logo_url}
+                    alt={`${me.school.name} logo`}
+                    className='size-9 shrink-0 rounded-md bg-white object-contain p-0.5'
+                  />
+                )}
+                <div className='min-w-0'>
+                  <div className='truncate text-xs font-bold text-sidebar-accent-foreground'>
+                    {me.school.name}
+                  </div>
+                  <div className='text-[11px] text-sidebar-muted'>School code {me.school.code}</div>
                 </div>
-                <div className='text-[11px] text-sidebar-muted'>School code {me.school.code}</div>
               </div>
             </div>
           )

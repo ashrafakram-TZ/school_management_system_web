@@ -67,7 +67,7 @@ export function SubstitutesPage() {
     try {
       await remove.mutateAsync(period.substitution_id)
       alerts.success(
-        `${period.substitute?.name ?? 'Substitute'} removed from period ${period.period_no}`
+        `${period.substitute?.name ?? 'Proxy'} removed from period ${period.period_no}`
       )
     } catch (error) {
       alerts.error(toApiError(error).message)
@@ -113,7 +113,7 @@ export function SubstitutesPage() {
       key: 'covered',
       label: 'Covered',
       value: data?.covered ?? 0,
-      hint: 'Substitute assigned',
+      hint: 'Proxy assigned',
       icon: CircleCheck,
       tone: 'success',
     },
@@ -121,7 +121,7 @@ export function SubstitutesPage() {
       key: 'uncovered',
       label: 'Not covered',
       value: data?.uncovered ?? 0,
-      hint: data?.uncovered ? 'Need a substitute' : 'Nothing left to cover',
+      hint: data?.uncovered ? 'Need a proxy' : 'Nothing left to cover',
       icon: CircleAlert,
       tone: data?.uncovered ? 'danger' : 'success',
     },
@@ -131,8 +131,8 @@ export function SubstitutesPage() {
     <Page>
       <PageHeader
         eyebrow='Academics'
-        title='Substitutes'
-        description='Teachers away on a day, the periods they miss and who covers each one. The substitute is told in the Staff app.'
+        title='Proxy'
+        description='Teachers on leave for a day, the periods they miss and the proxy teacher who takes each one. The proxy teacher is told in the Staff app.'
       />
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <DateStepper id='substitutes-date' value={date} onChange={setDate} allowFuture />
@@ -144,10 +144,14 @@ export function SubstitutesPage() {
         )}
       </div>
       {data && dayOff && <Notice>{dayOffText(data.holiday)}</Notice>}
-      {data && !dayOff && past && canManage && (
+      {data && !dayOff && !canManage && (
         <Notice tone='info'>
-          This date has passed. Substitutes can be set for today or later.
+          Only the Administrative officer (AO) or the super admin assigns proxies. You can see who
+          takes each period.
         </Notice>
+      )}
+      {data && !dayOff && past && canManage && (
+        <Notice tone='info'>This date has passed. Proxies can be set for today or later.</Notice>
       )}
       <InsightCards items={cards} loading={board.isPending} />
       {board.isPending ? (
