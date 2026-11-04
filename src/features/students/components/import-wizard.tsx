@@ -114,7 +114,7 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
                 className={cn(
                   'grid size-6 place-items-center rounded-full text-xs',
                   step > index + 1
-                    ? 'bg-success text-white'
+                    ? 'bg-success text-primary-foreground'
                     : step === index + 1
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted'

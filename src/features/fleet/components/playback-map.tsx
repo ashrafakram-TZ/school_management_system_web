@@ -32,7 +32,7 @@ const busIcon = L.divIcon({
 const stopIcon = (stop: StopArrival) =>
   L.divIcon({
     className: 'route-pin',
-    html: `<span class="grid size-7 place-items-center rounded-full border-2 border-white text-xs font-extrabold text-white shadow-md ${STOP_STATUS[stop.status].pin}">${stop.sequence}</span>`,
+    html: `<span class="grid size-7 place-items-center rounded-full border-2 border-white text-xs font-extrabold text-white shadow-md dark:text-background ${STOP_STATUS[stop.status].pin}">${stop.sequence}</span>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
   })

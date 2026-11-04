@@ -27,7 +27,7 @@ interface RouteMapProps {
 const stopIcon = (number: number, selected: boolean) =>
   L.divIcon({
     className: 'route-pin',
-    html: `<span class="grid size-7 place-items-center rounded-full border-2 border-white text-xs font-extrabold text-white shadow-md ${selected ? 'bg-info ring-4 ring-info/35' : 'bg-primary'}">${number}</span>`,
+    html: `<span class="grid size-7 place-items-center rounded-full border-2 border-white text-xs font-extrabold text-white shadow-md dark:text-background ${selected ? 'bg-info ring-4 ring-info/35' : 'bg-primary'}">${number}</span>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
   })

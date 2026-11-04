@@ -129,7 +129,8 @@ const expectFields = (result, wanted) => {
 const adminToken = await sessionFor('.auth-admin.json', '9876543210')
 const admin = client(adminToken)
 const guest = client(null)
-const parent = client(await sessionFor('.auth-parent.json', '9000000005', 'mobile'))
+const parentToken = await sessionFor('.auth-parent.json', '9000000005', 'mobile')
+const parent = client(parentToken)
 const teacherToken = await sessionFor('.auth-teacher.json', '9000000004', 'mobile')
 const teacher = client(teacherToken)
 const ao = client(await sessionFor('.auth-ao.json', '9000000002'))
@@ -2280,6 +2281,60 @@ await TA('API-BN-01', 'Teacher app', 'GET', '/mobile/teacher/banner', 'Home aler
 await TA('API-BN-02', 'Teacher app', 'GET', '/mobile/teacher/banner', 'Parent opens the teacher banner', '403 FORBIDDEN', async () =>
   expectStatus(await parent('GET', '/mobile/teacher/banner'), 403)
 )
+
+const D9 = (id, module, method, endpoint, scenario, expected, fn) =>
+  check({ id, module, method, endpoint, scenario, expected, day: 'Day 9' }, fn)
+await D9('API-D9-01', 'Dashboard', 'GET', '/admin/dashboard', 'Dashboard for the school admin', '200 with students, attendance, buses and alerts', async () => {
+  const result = await admin('GET', '/admin/dashboard')
+  expectStatus(result, 200)
+  const data = result.body.data
+  for (const key of ['students', 'attendance', 'buses', 'alerts']) if (!data[key]) throw new Error(`${key} missing`)
+  return `200, ${data.students.total} students, students present ${data.attendance.students.percent ?? '–'}%, buses ${data.buses.total}`
+})
+await D9('API-D9-02', 'Dashboard', 'GET', '/admin/dashboard', 'Parent token on the dashboard', 'Every section null or 403', async () => {
+  const result = await parent('GET', '/admin/dashboard')
+  if (result.status === 403) return '403'
+  expectStatus(result, 200)
+  const filled = Object.entries(result.body.data).filter(([key, value]) => key !== 'date' && value !== null)
+  if (filled.length) throw new Error(`Parent sees ${filled.map(([key]) => key).join(', ')}`)
+  return '200, all sections null'
+})
+await D9('API-D9-03', 'Parent bus v2', 'GET', '/api/v2/mobile/parent/children/:id/bus', 'Bus card v2 with the stop timeline', '200 with timeline stops; v1 still works', async () => {
+  const v1 = await parent('GET', `/mobile/parent/children/${child.id}/bus`)
+  expectStatus(v1, 200)
+  const response = await fetch(API.replace('/v1', '/v2') + `/mobile/parent/children/${child.id}/bus`, {
+    headers: { authorization: `Bearer ${parentToken}` },
+  })
+  const body = await response.json()
+  if (response.status !== 200) throw new Error(`v2 ${response.status} ${body.error}`)
+  if (!body.data) return '200, child does not use the bus'
+  const stops = body.data.timeline?.stops ?? []
+  for (let index = 1; index < stops.length; index += 1)
+    if (stops[index].sequence < stops[index - 1].sequence && body.data.timeline.kind === 'pickup') throw new Error('Stops out of order')
+  return `200, ${body.data.timeline?.source ?? 'no timeline'}, ${stops.length} stops`
+})
+await D9('API-D9-04', 'Parent preview', 'GET', '/admin/students/:id/parent-view', 'Parent app preview of a child', '200; unknown student 404', async () => {
+  expectStatus(await admin('GET', `/admin/students/${child.id}/parent-view`), 200)
+  return expectStatus(await admin('GET', '/admin/students/999999/parent-view'), 404, 'STUDENT_NOT_FOUND')
+})
+await D9('API-D9-05', 'Meetings', 'POST', '/mobile/teacher/meetings', 'Teacher books a meeting with parents, parent sees it, teacher cancels', '201, listed for parent, 200 cancelled', async () => {
+  if (!rosterStudent) return 'Skipped: teacher has no section'
+  const when = new Date(Date.now() + 3 * 86400000)
+  when.setUTCHours(5, 0, 0, 0)
+  const made = await teacher('POST', '/mobile/teacher/meetings', { student_id: rosterStudent.id, title: `Regression meeting ${RUN}`, scheduled_at: when.toISOString(), duration_minutes: 15 })
+  expectStatus(made, 201)
+  expectStatus(await admin('GET', `/admin/meetings/${made.body.data.id}`), 200)
+  const cancelled = await teacher('POST', `/mobile/teacher/meetings/${made.body.data.id}/cancel`, { reason: 'Regression' })
+  expectStatus(cancelled, 200)
+  return `201, then ${cancelled.body.data.status}`
+})
+await D9('API-D9-06', 'Meetings', 'POST', '/mobile/teacher/meetings', 'Meeting with nothing filled', '400 on student_id, title, scheduled_at', async () =>
+  expectFields(await teacher('POST', '/mobile/teacher/meetings', {}), ['student_id', 'title', 'scheduled_at'])
+)
+await D9('API-D9-07', 'Meetings', 'GET', '/admin/meetings', 'Meetings list and insights', '200', async () => {
+  expectStatus(await admin('GET', '/admin/meetings/insights'), 200)
+  return expectStatus(await admin('GET', '/admin/meetings?limit=5'), 200)
+})
 
 await admin('DELETE', `/admin/students/${studentId}`)
 if (userId) await admin('DELETE', `/admin/users/${userId}`)

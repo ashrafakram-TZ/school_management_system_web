@@ -334,18 +334,18 @@ export function UsersPage() {
               <div className='grid min-w-0 flex-1 gap-1.5'>
                 <div className='flex items-start justify-between gap-2'>
                   <div className='grid min-w-0'>
-                    <span className='flex items-center gap-1.5'>
+                    <span className='flex min-w-0 items-center gap-1.5'>
                       <span className='truncate font-bold'>{user.name}</span>
                       <LanguageTag language={user.language} />
                     </span>
                     <span className='tabular text-xs text-muted-foreground'>+91 {user.mobile}</span>
                   </div>
                   {user.status === 'active' ? (
-                    <Badge tone='success' dot>
+                    <Badge tone='success' dot className='shrink-0'>
                       Active
                     </Badge>
                   ) : (
-                    <Badge tone='neutral' dot>
+                    <Badge tone='neutral' dot className='shrink-0'>
                       Inactive
                     </Badge>
                   )}

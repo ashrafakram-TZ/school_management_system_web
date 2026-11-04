@@ -38,6 +38,7 @@ import { substitutesSearchSchema } from '@/features/substitutes/search'
 import { timetableSearchSchema } from '@/features/timetable/search'
 import { transportSearchSchema } from '@/features/transport/search'
 import { usersSearchSchema } from '@/features/users/search'
+import { parentPreviewSearchSchema } from '@/features/parent-preview/search'
 
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: Outlet,
@@ -319,6 +320,16 @@ const setupRoute = createRoute({
   component: lazyRouteComponent(() => import('@/features/setup/pages/setup-page'), 'SetupPage'),
 })
 
+const parentPreviewRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/parent-preview',
+  validateSearch: parentPreviewSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/parent-preview/pages/parent-preview-page'),
+    'ParentPreviewPage'
+  ),
+})
+
 const schoolsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/schools',
@@ -350,6 +361,7 @@ const routeTree = rootRoute.addChildren([
     routeBuilderRoute,
     setupRoute,
     schoolsRoute,
+    parentPreviewRoute,
     usersRoute,
     notificationsRoute,
     meetingsRoute,

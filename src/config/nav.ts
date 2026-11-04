@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   School,
   ShieldCheck,
+  Smartphone,
   Siren,
   Trophy,
   Truck,
@@ -28,6 +29,7 @@ import type { ShortcutId } from './shortcuts'
 
 export type NavPath =
   | '/'
+  | '/parent-preview'
   | '/students'
   | '/admissions'
   | '/guardians'
@@ -75,6 +77,14 @@ export const NAV_GROUPS: NavGroup[] = [
         description: 'School at a glance',
         icon: LayoutDashboard,
         shortcut: 'nav.dashboard',
+      },
+      {
+        to: '/parent-preview',
+        label: 'Parent app preview',
+        description: 'What a parent sees in the mobile app for their child',
+        icon: Smartphone,
+        shortcut: 'nav.parentPreview',
+        permission: 'students.view',
       },
     ],
   },

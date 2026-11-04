@@ -63,7 +63,7 @@ export function StopTimeline({ trip, elapsed }: { trip: TripDetail; elapsed: num
           >
             <span
               className={cn(
-                'z-10 grid size-7 place-items-center rounded-full border-2 border-card text-xs font-extrabold text-white',
+                'z-10 grid size-7 place-items-center rounded-full border-2 border-card text-xs font-extrabold text-white dark:text-background',
                 status.pin,
                 stop.status === 'approaching' && 'ring-4 ring-warning/30'
               )}

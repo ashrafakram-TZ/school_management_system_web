@@ -2131,6 +2131,51 @@ await D7W(
     await see('Timeline')
   }
 )
+const D9W = (meta, fn) => test({ ...meta, day: 'Day 9' }, fn)
+await D9W(
+  {
+    id: 'D9-01',
+    module: 'Dashboard',
+    type: 'Filter',
+    title: 'Attendance card opens the attendance board',
+    steps: 'Dashboard, click Students present.',
+    expected: 'Attendance page, students tab',
+  },
+  async () => {
+    await go('/')
+    await page.locator('div.grid.grid-cols-2 > button[aria-pressed]', { hasText: /present/i }).first().click()
+    await page.waitForURL(/\/attendance/, { timeout: 8000 })
+  }
+)
+await D9W(
+  {
+    id: 'D9-02',
+    module: 'Parent preview',
+    type: 'View',
+    title: 'Parent app preview shows a child in the phone',
+    steps: 'Open Parent app preview, choose the first student.',
+    expected: 'Phone frame with the child’s home screen',
+  },
+  async () => {
+    const target = (await api('GET', '/admin/students?limit=1&status=active')).data.items[0]
+    await go(`/parent-preview?student=${target.id}`)
+    await see(target.first_name ?? target.full_name.split(' ')[0])
+  }
+)
+await D9W(
+  {
+    id: 'D9-03',
+    module: 'Meetings',
+    type: 'View',
+    title: 'Meetings page lists meetings with insight cards',
+    steps: 'Open Meetings.',
+    expected: 'Meetings page loads',
+  },
+  async () => {
+    await go('/meetings')
+    await page.getByRole('heading', { name: /Meetings/ }).first().waitFor({ timeout: 8000 })
+  }
+)
 {
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -2153,6 +2198,8 @@ await D7W(
     ['RS-12', '/activities', 'Leaderboard'],
     ['RS-13', '/fleet/alerts', 'SOS active'],
     ['RS-14', '/fleet/maintenance', 'Tickets'],
+    ['RS-15', '/parent-preview', /Parent app/],
+    ['RS-16', '/meetings', /Meetings/],
   ]) {
     await test(
       {

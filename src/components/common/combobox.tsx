@@ -22,6 +22,7 @@ interface ComboboxProps {
   invalid?: boolean
   highlightSelected?: boolean
   emptyText?: string
+  onSearch?: (query: string) => void
 }
 
 const VISIBLE_ROWS = 5
@@ -39,6 +40,7 @@ export function Combobox({
   invalid,
   highlightSelected = true,
   emptyText = 'No options yet',
+  onSearch,
 }: ComboboxProps) {
   const listId = useId()
   const listRef = useRef<HTMLDivElement>(null)
@@ -49,8 +51,10 @@ export function Combobox({
   const items = useMemo(() => {
     const all: ComboboxOption[] = allLabel ? [{ value: '', label: allLabel }, ...options] : options
     const term = query.trim().toLowerCase()
-    return term ? all.filter((option) => option.label.toLowerCase().includes(term)) : all
-  }, [allLabel, options, query])
+    return term && !onSearch
+      ? all.filter((option) => option.label.toLowerCase().includes(term))
+      : all
+  }, [allLabel, options, query, onSearch])
 
   const selected = options.find((option) => option.value === value)
 
@@ -64,6 +68,7 @@ export function Combobox({
   const changeOpen = (next: boolean) => {
     setOpen(next)
     setQuery('')
+    onSearch?.('')
     if (next) {
       const index = (allLabel ? [{ value: '' }, ...options] : options).findIndex(
         (option) => option.value === (value ?? '')
@@ -134,6 +139,7 @@ export function Combobox({
             value={query}
             onChange={(event) => {
               setQuery(event.target.value)
+              onSearch?.(event.target.value)
               setActive(0)
             }}
             onKeyDown={onKeyDown}

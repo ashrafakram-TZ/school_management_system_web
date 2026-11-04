@@ -1,51 +1,52 @@
-import { Link } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import {
-  ArrowRight,
   Bus,
+  CalendarCheck,
   ClipboardList,
   GraduationCap,
+  IndianRupee,
+  Siren,
+  TriangleAlert,
   UserRoundCheck,
   UsersRound,
-  type LucideIcon,
 } from 'lucide-react'
 import { ErrorState } from '@/components/common/display'
 import { FleetMap } from '@/components/common/fleet-map'
+import { InsightCards, type Insight } from '@/components/common/insight-cards'
 import { Page, PageHeader } from '@/components/common/page'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SosBanner } from '@/features/alerts/components/sos-banner'
-import { can, useMe } from '@/features/auth/api'
+import { can, useMe, type Me } from '@/features/auth/api'
 import { SportsStarsCard } from '@/features/activities/components/sports-stars-card'
 import { TopRankHoldersCard } from '@/features/exams/components/top-rank-holders-card'
+import { wholeRupees } from '@/features/fees/labels'
 import { useFleetLive, VEHICLE_STATE } from '@/features/fleet/api'
-import { useStaffInsights } from '@/features/staff/api'
-import { useAdmissionInsights, useStudentInsights } from '@/features/students/api'
 import { formatNumber } from '@/lib/format'
-import { cn } from '@/lib/utils'
+import { useDashboard, type Dashboard } from '../api'
 
-type TileLink =
-  | { to: '/students'; search: { page: number } }
-  | { to: '/admissions'; search: { page: number } }
-  | { to: '/staff'; search: { page: number } }
-  | { to: '/fleet' }
+type Navigate = ReturnType<typeof useNavigate>
 
 export function DashboardPage() {
   const me = useMe().data
-  const firstName = me?.name.split(' ')[0] ?? ''
+  const dashboard = useDashboard()
+  const navigate = useNavigate()
+  const firstName = greetingName(me?.name ?? '')
+  const items = insights(me, dashboard.data, navigate)
   return (
     <Page>
       <PageHeader
         eyebrow='Overview'
         title={`Good ${greeting()}, ${firstName}`}
-        description='Today at a glance: students, admissions, staff and buses.'
+        description='Today at a glance: students, attendance, staff, buses and alerts.'
       />
       {can(me, 'fleet.view') && <SosBanner />}
-      <div className='grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4'>
-        {can(me, 'students.view') && <StudentTiles />}
-        {can(me, 'staff.view') && <StaffTile />}
-        {can(me, 'fleet.view') && <BusTile />}
-      </div>
+      {dashboard.isError && !dashboard.data ? (
+        <ErrorState message={dashboard.error.message} onRetry={() => dashboard.refetch()} />
+      ) : (
+        items.length > 0 && <InsightCards items={items} loading={dashboard.isPending} />
+      )}
       {can(me, 'fleet.view') && <BusMap />}
       {can(me, 'exams.view') && <TopRankHoldersCard />}
       {can(me, 'students.view') && <SportsStarsCard />}
@@ -60,103 +61,119 @@ function greeting() {
   return hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
 }
 
-function Tile({
-  link,
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone,
-  loading,
-}: {
-  link: TileLink
-  label: string
-  value: string | number
-  hint: string
-  icon: LucideIcon
-  tone: string
-  loading?: boolean
-}) {
-  return (
-    <Link
-      {...link}
-      className='group grid gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none sm:p-5'
-    >
-      <div className='flex items-start justify-between gap-2'>
-        <span className='text-sm font-semibold text-muted-foreground'>{label}</span>
-        <span className={cn('grid size-9 place-items-center rounded-lg', tone)}>
-          <Icon className='size-4' />
-        </span>
-      </div>
-      {loading ? (
-        <Skeleton className='h-8 w-16' />
-      ) : (
-        <span className='tabular text-3xl font-extrabold tracking-tight'>{value}</span>
-      )}
-      <span className='flex items-center justify-between gap-2 text-xs text-muted-foreground'>
-        {hint}
-        <ArrowRight className='size-3.5 opacity-0 transition-opacity group-hover:opacity-100' />
-      </span>
-    </Link>
-  )
+const percentText = (value: number | null | undefined) =>
+  value === null || value === undefined ? '—' : `${formatNumber(value, value % 1 ? 1 : 0)}%`
+
+function attendanceTone(percent: number | null | undefined): Insight['tone'] {
+  if (percent === null || percent === undefined) return 'neutral'
+  return percent >= 90 ? 'success' : percent >= 75 ? 'warning' : 'danger'
 }
 
-function StudentTiles() {
-  const students = useStudentInsights()
-  const admissions = useAdmissionInsights()
-  return (
-    <>
-      <Tile
-        link={{ to: '/students', search: { page: 1 } }}
-        label='Students'
-        value={formatNumber(students.data?.total)}
-        hint={`${students.data?.new_this_month ?? 0} joined this month`}
-        icon={GraduationCap}
-        tone='bg-primary/10 text-primary'
-        loading={students.isPending}
-      />
-      <Tile
-        link={{ to: '/admissions', search: { page: 1 } }}
-        label='Applications waiting'
-        value={formatNumber(admissions.data?.applied)}
-        hint={`${admissions.data?.approved ?? 0} approved, not enrolled`}
-        icon={ClipboardList}
-        tone='bg-info/10 text-info'
-        loading={admissions.isPending}
-      />
-    </>
-  )
-}
-
-function StaffTile() {
-  const staff = useStaffInsights()
-  const attention = staff.data?.need_attention ?? 0
-  return (
-    <Tile
-      link={{ to: '/staff', search: { page: 1 } }}
-      label='Staff'
-      value={formatNumber(staff.data?.total_staff)}
-      hint={attention ? `${attention} need attention` : 'All records complete'}
-      icon={attention ? UsersRound : UserRoundCheck}
-      tone={attention ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'}
-      loading={staff.isPending}
-    />
-  )
-}
-
-function BusTile() {
-  const live = useFleetLive()
-  return (
-    <Tile
-      link={{ to: '/fleet' }}
-      label='Buses moving'
-      value={live.isError ? '—' : `${live.data?.moving ?? 0}/${live.data?.total ?? 0}`}
-      hint={live.isError ? 'Bus tracking is not reachable' : `${live.data?.offline ?? 0} offline`}
-      icon={Bus}
-      tone='bg-success/10 text-success'
-      loading={live.isPending}
-    />
-  )
+function insights(me: Me | undefined, data: Dashboard | undefined, navigate: Navigate): Insight[] {
+  const items: Insight[] = []
+  if (can(me, 'students.view')) {
+    items.push(
+      {
+        key: 'students',
+        label: 'Students',
+        value: formatNumber(data?.students?.total),
+        hint: `${data?.students?.joined_this_month ?? 0} joined this month`,
+        icon: GraduationCap,
+        tone: 'primary',
+        onClick: () => navigate({ to: '/students', search: { page: 1 } }),
+      },
+      {
+        key: 'admissions',
+        label: 'Applications',
+        value: formatNumber(data?.students?.applications_waiting),
+        hint: `${data?.students?.approved_not_enrolled ?? 0} approved, not enrolled`,
+        icon: ClipboardList,
+        tone: 'info',
+        onClick: () => navigate({ to: '/admissions', search: { page: 1 } }),
+      }
+    )
+  }
+  if (can(me, 'attendance.view')) {
+    const students = data?.attendance?.students
+    const staff = data?.attendance?.staff
+    items.push(
+      {
+        key: 'student-attendance',
+        label: 'Students present',
+        value: students && !students.working_day ? 'Holiday' : percentText(students?.percent),
+        hint: students
+          ? `${students.marked_sections}/${students.total_sections} sections marked`
+          : undefined,
+        icon: CalendarCheck,
+        tone: attendanceTone(students?.percent),
+        onClick: () =>
+          navigate({ to: '/attendance', search: { tab: 'students', leave: 'student', page: 1 } }),
+      },
+      {
+        key: 'staff-attendance',
+        label: 'Staff checked in',
+        value: percentText(staff?.percent),
+        hint: staff
+          ? `${staff.checked_in} of ${staff.total - staff.on_leave} · ${staff.on_leave} on leave`
+          : undefined,
+        icon: UserRoundCheck,
+        tone: attendanceTone(staff?.percent),
+        onClick: () =>
+          navigate({ to: '/attendance', search: { tab: 'staff', leave: 'student', page: 1 } }),
+      }
+    )
+  }
+  if (can(me, 'staff.view')) {
+    const attention = data?.staff?.need_attention ?? 0
+    items.push({
+      key: 'staff',
+      label: 'Staff',
+      value: formatNumber(data?.staff?.total),
+      hint: attention ? `${attention} need attention` : 'All records complete',
+      icon: UsersRound,
+      tone: attention ? 'warning' : 'success',
+      onClick: () => navigate({ to: '/staff', search: { page: 1 } }),
+    })
+  }
+  if (can(me, 'fleet.view')) {
+    const buses = data?.buses
+    const alerts = data?.alerts
+    const down = buses?.telematics_available === false
+    items.push(
+      {
+        key: 'buses',
+        label: 'Buses moving',
+        value: down || !buses ? '—' : `${buses.moving ?? 0}/${buses.total}`,
+        hint: down ? 'Bus tracking is not reachable' : `${buses?.offline ?? 0} offline`,
+        icon: Bus,
+        tone: down ? 'neutral' : 'success',
+        onClick: () => navigate({ to: '/fleet' }),
+      },
+      {
+        key: 'alerts',
+        label: 'Open alerts',
+        value: formatNumber(alerts?.open),
+        hint: alerts?.sos_open
+          ? `${alerts.sos_open} SOS active`
+          : `${alerts?.high_open ?? 0} high severity`,
+        icon: alerts?.sos_open ? Siren : TriangleAlert,
+        tone: alerts?.sos_open ? 'danger' : alerts?.open ? 'warning' : 'success',
+        onClick: () => navigate({ to: '/fleet/alerts', search: { page: 1, status: 'open' } }),
+      }
+    )
+  }
+  if (can(me, 'fees.view') && data?.fees !== null) {
+    items.push({
+      key: 'fees',
+      label: 'Fees overdue',
+      value: data?.fees ? wholeRupees(data.fees.overdue_amount) : '—',
+      hint: data?.fees ? `${data.fees.overdue_students} students` : undefined,
+      icon: IndianRupee,
+      tone: data?.fees?.overdue_amount ? 'danger' : 'success',
+      onClick: () => navigate({ to: '/fees', search: { tab: 'dues', overdue: true } }),
+    })
+  }
+  return items
 }
 
 function BusMap() {
@@ -199,4 +216,21 @@ function BusMap() {
       )}
     </Card>
   )
+}
+
+const ROLE_WORDS = [
+  'school',
+  'admin',
+  'super',
+  'principal',
+  'administrative',
+  'officer',
+  'transport',
+  'tamilzorous',
+]
+
+function greetingName(name: string) {
+  const words = name.trim().split(/s+/).filter(Boolean)
+  const personal = words.find((word) => !ROLE_WORDS.includes(word.toLowerCase()))
+  return personal ?? 'there'
 }
