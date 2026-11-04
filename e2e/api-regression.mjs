@@ -2267,6 +2267,20 @@ await D7('API-D7-12', 'Playback', 'GET', '/admin/fleet/trips/:id/playback', 'Rep
   return `200, ${points.length} points`
 })
 
+await TA('API-BN-01', 'Teacher app', 'GET', '/mobile/teacher/banner', 'Home alert banner', '200, banners sorted critical → warning → info', async () => {
+  const result = await teacher('GET', '/mobile/teacher/banner')
+  expectStatus(result, 200)
+  const order = { critical: 0, warning: 1, info: 2 }
+  const banners = result.body.data.banners
+  for (let index = 1; index < banners.length; index += 1)
+    if (order[banners[index].severity] < order[banners[index - 1].severity]) throw new Error('Not sorted by severity')
+  if (banners.some((item) => !item.code || !item.action?.screen)) throw new Error('Banner without code or action')
+  return `200, ${banners.map((item) => item.code).join(', ') || 'no banners'}`
+})
+await TA('API-BN-02', 'Teacher app', 'GET', '/mobile/teacher/banner', 'Parent opens the teacher banner', '403 FORBIDDEN', async () =>
+  expectStatus(await parent('GET', '/mobile/teacher/banner'), 403)
+)
+
 await admin('DELETE', `/admin/students/${studentId}`)
 if (userId) await admin('DELETE', `/admin/users/${userId}`)
 
