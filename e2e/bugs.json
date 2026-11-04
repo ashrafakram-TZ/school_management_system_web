@@ -148,5 +148,50 @@
     "status": "Fixed",
     "fix": "One shared toBoolean helper in @app/common reads the raw query value before implicit conversion; used in every DTO; unit test added",
     "retest": "Pass (has_structure=false → 1, true → 12; PY-01)"
+  },
+  {
+    "id": "BUG-011",
+    "day": "Day 8",
+    "found": "2026-11-04",
+    "module": "Meetings",
+    "layer": "Backend",
+    "severity": "Medium",
+    "title": "Principal and AO could not open Meetings",
+    "steps": "Sign in as the principal (9000000001) and look for Communication → Meetings",
+    "expected": "Meetings in the menu and the list loads",
+    "actual": "No Meetings menu item: only School admin had meetings.view",
+    "status": "Fixed",
+    "fix": "access.catalog.ts: meetings.view added to Principal and AO; npm run seed",
+    "retest": "Pass (MT-25)"
+  },
+  {
+    "id": "BUG-012",
+    "day": "Day 8",
+    "found": "2026-11-04",
+    "module": "Meetings",
+    "layer": "Frontend",
+    "severity": "Low",
+    "title": "Teacher and parent names cut off at tablet width in From → To",
+    "steps": "Open /meetings at 820 x 1180",
+    "expected": "Full names, wrapping to a second line if needed",
+    "actual": "Names shown as \"Priy…\" and \"Laksh…\"",
+    "status": "Fixed",
+    "fix": "meeting-people.tsx: names wrap instead of truncating",
+    "retest": "Pass (MT-23)"
+  },
+  {
+    "id": "BUG-013",
+    "day": "Day 8",
+    "found": "2026-11-04",
+    "module": "Meetings",
+    "layer": "Backend",
+    "severity": "Low",
+    "title": "Missing meeting fields showed the wrong first message",
+    "steps": "POST /mobile/teacher/meetings without title or student_id, or with duration_minutes \"ten\"",
+    "expected": "Enter a title for the meeting · Choose the student · duration_minutes must be a whole number of minutes",
+    "actual": "title must be shorter than or equal to 150 characters · student_id must not be less than 1 · duration_minutes must not be greater than 60",
+    "status": "Fixed",
+    "fix": "meeting.dto.ts: validator order and clear messages for required fields",
+    "retest": "Pass (API-VM validation rows)"
   }
 ]

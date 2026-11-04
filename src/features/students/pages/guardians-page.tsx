@@ -250,6 +250,7 @@ export function GuardiansPage() {
       <GuardianSheet
         guardianId={openId ?? null}
         canManage={can(me, 'students.manage')}
+        canSeeMeetings={can(me, 'meetings.view')}
         onClose={() => openParent(undefined)}
       />
     </Page>

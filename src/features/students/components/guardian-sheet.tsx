@@ -21,16 +21,19 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { alerts } from '@/lib/alerts'
 import { toApiError } from '@/lib/api/errors'
 import { formatDate, timeAgo } from '@/lib/format'
+import { ParentMeetings } from '@/features/meetings/components/parent-meetings'
 import { studentsApi, useGuardian, useStudentMutation, type GuardianDetail } from '../api'
 import { RELATION_LABELS, yearsLabel } from '../labels'
 
 export function GuardianSheet({
   guardianId,
   canManage,
+  canSeeMeetings = false,
   onClose,
 }: {
   guardianId: number | null
   canManage: boolean
+  canSeeMeetings?: boolean
   onClose: () => void
 }) {
   const navigate = useNavigate()
@@ -157,6 +160,12 @@ export function GuardianSheet({
                       </li>
                     ))}
                   </ul>
+                </Block>
+              )}
+
+              {canSeeMeetings && (
+                <Block title='Video meetings'>
+                  <ParentMeetings guardianId={data.id} />
                 </Block>
               )}
 
