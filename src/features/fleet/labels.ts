@@ -2,7 +2,16 @@ import type { BadgeTone } from '@/components/ui/badge'
 import { config } from '@/config/env'
 import { alerts } from '@/lib/alerts'
 import type { TripEventMessage, TripPositionMessage } from '@/lib/live/socket'
-import type { StopStatus, TripDetail, TripKind, TripStatus, TripStop } from './api'
+import type {
+  HealthStatus,
+  SafetyKind,
+  Severity,
+  StopStatus,
+  TripDetail,
+  TripKind,
+  TripStatus,
+  TripStop,
+} from './api'
 
 export const TRIP_KIND: Record<TripKind, string> = {
   pickup: 'Morning pickup',
@@ -26,6 +35,38 @@ export const STOP_STATUS: Record<StopStatus, { label: string; tone: BadgeTone; p
   arrived: { label: 'At the stop', tone: 'info', pin: 'bg-info' },
   departed: { label: 'Done', tone: 'success', pin: 'bg-success' },
   skipped: { label: 'Skipped', tone: 'danger', pin: 'bg-destructive' },
+}
+
+export const TRIP_STATUS_OPTIONS = (Object.keys(TRIP_STATUS) as TripStatus[]).map((value) => ({
+  value,
+  label: TRIP_STATUS[value].label,
+}))
+
+export const HEALTH_STATUS: Record<HealthStatus, { label: string; tone: BadgeTone }> = {
+  good: { label: 'Good', tone: 'success' },
+  warning: { label: 'Needs a look', tone: 'warning' },
+  critical: { label: 'Critical', tone: 'danger' },
+  unknown: { label: 'Unknown', tone: 'neutral' },
+}
+
+export const SEVERITY: Record<Severity, { label: string; tone: BadgeTone; color: string }> = {
+  low: { label: 'Low', tone: 'info', color: '#2563eb' },
+  medium: { label: 'Medium', tone: 'warning', color: '#c27a00' },
+  high: { label: 'High', tone: 'danger', color: '#d92d20' },
+}
+
+export const SAFETY_KIND: Record<SafetyKind, string> = {
+  overspeed: 'Overspeed',
+  harsh_braking: 'Harsh braking',
+  idle: 'Long idle',
+  route_deviation: 'Off route',
+}
+
+export const durationText = (seconds: number | null | undefined) => {
+  if (seconds === null || seconds === undefined) return '—'
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes} min`
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`
 }
 
 export const END_REASON: Record<string, string> = {

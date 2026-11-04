@@ -162,13 +162,25 @@ export type AchievementCategory =
   'academic' | 'sports' | 'arts' | 'cultural' | 'competition' | 'leadership' | 'other'
 export type AchievementLevel =
   'class' | 'school' | 'zone' | 'district' | 'state' | 'national' | 'international'
+export type AchievementResult = 'winner' | 'runner_up' | 'third_place' | 'participated'
+export type EventScope = 'sports_day' | 'in_school' | 'inter_school' | 'out_of_school'
+export type VenueType = 'indoor' | 'outdoor'
+export type Participation = 'individual' | 'team'
 
 export interface Achievement {
   id: number
   title: string
   category: AchievementCategory
   level: AchievementLevel
+  result: AchievementResult
+  event_scope: EventScope
+  venue_type: VenueType | null
+  participation: Participation
+  team_name: string | null
   position: string | null
+  prize_received: string | null
+  school_reward: string | null
+  points: number
   achieved_on: string
   description: string | null
   file: UploadedFile | null
@@ -181,7 +193,14 @@ export interface AchievementInput {
   title: string
   category: AchievementCategory
   level: AchievementLevel
+  result: AchievementResult
+  event_scope: EventScope
+  venue_type: VenueType | null
+  participation: Participation
+  team_name: string | null
   position: string | null
+  prize_received: string | null
+  school_reward: string | null
   achieved_on: string
   description: string | null
   file_id: number | null

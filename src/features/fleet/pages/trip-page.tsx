@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { getRouteApi, useNavigate } from '@tanstack/react-router'
+import { Link, getRouteApi, useNavigate } from '@tanstack/react-router'
 import {
   ArrowLeft,
   Bell,
@@ -10,7 +10,9 @@ import {
   Gauge,
   ListChecks,
   MapPin,
+  PlayCircle,
   Route as RouteIcon,
+  ScanLine,
   Users,
 } from 'lucide-react'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
@@ -28,6 +30,7 @@ import { useLiveEvent, useLiveSubscription } from '@/lib/live/socket'
 import { fleetApi, fleetKeys, useTrip, useTripMutation, type TripDetail } from '../api'
 import { LiveBadge } from '../components/live-badge'
 import { TripMap } from '../components/trip-map'
+import { BoardingLog } from '../components/boarding-log'
 import { EventLog, NotBoarded, StopTimeline } from '../components/trip-timeline'
 import { TripStatusBadge } from '../components/trips-panel'
 import {
@@ -117,6 +120,13 @@ export function TripPage() {
     showTripToast(message, trip?.vehicle.name ?? 'The bus', trip?.kind, true)
   })
 
+  const refreshBoardings = (message: { trip_id: number }) => {
+    if (message.trip_id === tripId)
+      void queryClient.invalidateQueries({ queryKey: fleetKeys.trip(tripId) })
+  }
+  useLiveEvent('passenger.boarded', refreshBoardings)
+  useLiveEvent('passenger.alighted', refreshBoardings)
+
   const back = () => navigate({ to: '/fleet' })
 
   if (detail.isError && !trip) {
@@ -186,6 +196,14 @@ export function TripPage() {
               <ArrowLeft />
               Bus tracking
             </Button>
+            {trip?.status === 'ended' && (
+              <Button variant='outline' asChild>
+                <Link to='/fleet/trips/$tripId/playback' params={{ tripId }}>
+                  <PlayCircle />
+                  Replay
+                </Link>
+              </Button>
+            )}
             {canManage && active && (
               <Button variant='destructive' onClick={() => setConfirmEnd(true)}>
                 <CircleStop />
@@ -281,9 +299,12 @@ export function TripPage() {
         </Section>
       </div>
 
-      <div className='grid min-w-0 gap-4 md:grid-cols-2'>
+      <div className='grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3'>
         <Section icon={Bell} title='Events' className='min-w-0 overflow-hidden'>
           {trip ? <EventLog trip={trip} /> : <Skeleton className='m-4 h-24' />}
+        </Section>
+        <Section icon={ScanLine} title='Boarding' className='min-w-0 overflow-hidden'>
+          {trip ? <BoardingLog trip={trip} /> : <Skeleton className='m-4 h-24' />}
         </Section>
         <Section icon={Users} title='Not boarded' className='min-w-0 overflow-hidden'>
           {trip ? <NotBoarded trip={trip} /> : <Skeleton className='m-4 h-24' />}

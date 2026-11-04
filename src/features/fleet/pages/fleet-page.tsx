@@ -34,8 +34,9 @@ import {
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { today } from '@/features/attendance/labels'
+import { SosBanner } from '@/features/alerts/components/sos-banner'
 import { can, useMe } from '@/features/auth/api'
-import { useBuses } from '@/features/transport/api'
+import { useBuses, type Bus as SchoolBus } from '@/features/transport/api'
 import { useNow } from '@/hooks/use-now'
 import { useSelectedSchool } from '@/lib/auth/school-context'
 import { formatDateTime, formatNumber, timeAgo } from '@/lib/format'
@@ -56,6 +57,7 @@ import {
 import { LiveBadge } from '../components/live-badge'
 import { StartTripModal } from '../components/start-trip-modal'
 import { TripsPanel } from '../components/trips-panel'
+import { VehicleHealthCard } from '../components/vehicle-health-card'
 import { showTripToast } from '../labels'
 
 type Filter = 'all' | 'moving' | 'idle' | 'parked' | 'offline' | 'attention'
@@ -137,6 +139,13 @@ export function FleetPage() {
   })
   const vehicles = all.filter((vehicle) => matches(vehicle, filter))
   const open = all.find((vehicle) => vehicle.id === openId) ?? null
+  const openBus = open
+    ? (buses.data?.items.find(
+        (bus) =>
+          bus.device &&
+          ((bus.device.imei && bus.device.imei === open.imei) || bus.device.id === open.id)
+      ) ?? null)
+    : null
   const attention = all.filter((vehicle) => vehicle.alerts.length > 0).length
   const toggle = (next: Filter) => setFilter((current) => (current === next ? 'all' : next))
 
@@ -267,6 +276,7 @@ export function FleetPage() {
         description='Where every bus is, whether the engine is on, fuel, battery and harsh driving. Buses on a trip move live.'
         actions={<LiveBadge status={socket.status} state={socket.state} />}
       />
+      <SosBanner />
       {live.isError && !data ? (
         <Card className='p-6'>
           <ErrorState message={live.error.message} onRetry={() => live.refetch()} />
@@ -367,7 +377,7 @@ export function FleetPage() {
           </Card>
         </>
       )}
-      <VehicleSheet vehicle={open} now={now} onClose={() => setOpenId(null)} />
+      <VehicleSheet vehicle={open} bus={openBus} now={now} onClose={() => setOpenId(null)} />
       {starting && <StartTripModal onClose={() => setStarting(false)} />}
     </Page>
   )
@@ -466,10 +476,12 @@ function Tile({
 
 function VehicleSheet({
   vehicle,
+  bus,
   now,
   onClose,
 }: {
   vehicle: Vehicle | null
+  bus: SchoolBus | null
   now: number
   onClose: () => void
 }) {
@@ -548,6 +560,7 @@ function VehicleSheet({
                   </>
                 )}
               </div>
+              {bus && <VehicleHealthCard busId={bus.id} busName={bus.name} />}
               {!vehicle.position && (
                 <EmptyState
                   icon={MapPin}

@@ -29,6 +29,10 @@ import {
 import { payrollSearchSchema } from '@/features/payroll/search'
 import { feesSearchSchema } from '@/features/fees/search'
 import { examsSearchSchema } from '@/features/exams/search'
+import { tripHistorySearchSchema } from '@/features/fleet/search'
+import { maintenanceSearchSchema } from '@/features/maintenance/search'
+import { alertsSearchSchema } from '@/features/alerts/search'
+import { activitiesSearchSchema } from '@/features/activities/search'
 import { substitutesSearchSchema } from '@/features/substitutes/search'
 import { timetableSearchSchema } from '@/features/timetable/search'
 import { transportSearchSchema } from '@/features/transport/search'
@@ -101,6 +105,46 @@ const tripRoute = createRoute({
     stringify: (params) => ({ tripId: String(params.tripId) }),
   },
   component: lazyRouteComponent(() => import('@/features/fleet/pages/trip-page'), 'TripPage'),
+})
+
+const tripPlaybackRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/fleet/trips/$tripId/playback',
+  params: {
+    parse: (raw) => ({ tripId: z.coerce.number().int().min(1).parse(raw.tripId) }),
+    stringify: (params) => ({ tripId: String(params.tripId) }),
+  },
+  component: lazyRouteComponent(
+    () => import('@/features/fleet/pages/playback-page'),
+    'PlaybackPage'
+  ),
+})
+
+const tripHistoryRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/fleet/history',
+  validateSearch: tripHistorySearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/fleet/pages/trip-history-page'),
+    'TripHistoryPage'
+  ),
+})
+
+const fleetAlertsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/fleet/alerts',
+  validateSearch: alertsSearchSchema,
+  component: lazyRouteComponent(() => import('@/features/alerts/pages/alerts-page'), 'AlertsPage'),
+})
+
+const maintenanceRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/fleet/maintenance',
+  validateSearch: maintenanceSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/maintenance/pages/maintenance-page'),
+    'MaintenancePage'
+  ),
 })
 
 const studentsRoute = createRoute({
@@ -224,6 +268,16 @@ const examsRoute = createRoute({
   component: lazyRouteComponent(() => import('@/features/exams/pages/exams-page'), 'ExamsPage'),
 })
 
+const activitiesRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/activities',
+  validateSearch: activitiesSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/activities/pages/activities-page'),
+    'ActivitiesPage'
+  ),
+})
+
 const transportRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/transport',
@@ -280,6 +334,7 @@ const routeTree = rootRoute.addChildren([
     payrollRoute,
     feesRoute,
     examsRoute,
+    activitiesRoute,
     transportRoute,
     routeBuilderRoute,
     setupRoute,
@@ -288,6 +343,10 @@ const routeTree = rootRoute.addChildren([
     notificationsRoute,
     fleetRoute,
     tripRoute,
+    tripPlaybackRoute,
+    tripHistoryRoute,
+    maintenanceRoute,
+    fleetAlertsRoute,
   ]),
 ])
 

@@ -12,11 +12,15 @@ import {
   Grid3x3,
   IndianRupee,
   HeartHandshake,
+  History,
   LayoutDashboard,
   School,
   ShieldCheck,
+  Siren,
+  Trophy,
   Truck,
   UsersRound,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import type { ShortcutId } from './shortcuts'
@@ -34,9 +38,13 @@ export type NavPath =
   | '/payroll'
   | '/fees'
   | '/exams'
+  | '/activities'
   | '/transport'
   | '/notifications'
   | '/fleet'
+  | '/fleet/alerts'
+  | '/fleet/history'
+  | '/fleet/maintenance'
   | '/setup'
   | '/schools'
   | '/users'
@@ -148,6 +156,14 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: 'nav.exams',
         permission: 'exams.view',
       },
+      {
+        to: '/activities',
+        label: 'Sports & activities',
+        description: 'Students ranked by sports, competitions and activities, not only marks',
+        icon: Trophy,
+        shortcut: 'nav.activities',
+        permission: 'students.view',
+      },
     ],
   },
   {
@@ -196,6 +212,30 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'fleet.view',
       },
       {
+        to: '/fleet/alerts',
+        label: 'Alerts',
+        description: 'SOS from drivers and safety alerts from the buses',
+        icon: Siren,
+        shortcut: 'nav.alerts',
+        permission: 'fleet.view',
+      },
+      {
+        to: '/fleet/history',
+        label: 'Trip history',
+        description: 'Past trips by date, route and bus, with a replay of each one',
+        icon: History,
+        shortcut: 'nav.tripHistory',
+        permission: 'fleet.view',
+      },
+      {
+        to: '/fleet/maintenance',
+        label: 'Maintenance',
+        description: 'Repair tickets from engine faults and the fuel log',
+        icon: Wrench,
+        shortcut: 'nav.maintenance',
+        permission: 'fleet.view',
+      },
+      {
         to: '/transport',
         label: 'Buses and routes',
         description: 'Buses, drivers, routes, stops and students on each bus',
@@ -237,3 +277,22 @@ export const NAV_GROUPS: NavGroup[] = [
 ]
 
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items)
+
+const isPlayback = (pathname: string) =>
+  pathname.startsWith('/fleet/trips/') && pathname.endsWith('/playback')
+
+const matches = (pathname: string, to: string) =>
+  to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`)
+
+export function currentNav(pathname: string): { group: string; item: NavItem } {
+  const target: string = isPlayback(pathname) ? '/fleet/history' : pathname
+  let best: { group: string; item: NavItem } | null = null
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (matches(target, item.to) && (!best || item.to.length > best.item.to.length)) {
+        best = { group: group.label, item }
+      }
+    }
+  }
+  return best ?? { group: NAV_GROUPS[0].label, item: NAV_GROUPS[0].items[0] }
+}

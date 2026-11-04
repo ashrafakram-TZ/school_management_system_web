@@ -1,8 +1,8 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import { X } from 'lucide-react'
 import { BrandLogo, BrandMark } from '@/components/common/brand-logo'
 import { Button } from '@/components/ui/button'
-import { NAV_GROUPS } from '@/config/nav'
+import { currentNav, NAV_GROUPS } from '@/config/nav'
 import { can, type Me } from '@/features/auth/api'
 import { cn } from '@/lib/utils'
 import { SchoolSwitcher } from './school-switcher'
@@ -15,6 +15,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSidebarProps) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const activeTo = currentNav(pathname).item.to
   const groups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => can(me, item.permission)),
@@ -103,23 +105,24 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
                       <Link
                         to={item.to}
                         onClick={onMobileClose}
-                        activeOptions={{ exact: item.to === '/' }}
+                        activeOptions={{ exact: true }}
+                        data-current={item.to === activeTo ? 'true' : undefined}
                         title={collapsed ? item.label : undefined}
                         className={cn(
                           'group relative flex h-9 min-w-0 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-primary',
-                          'data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground',
+                          'data-[current=true]:bg-sidebar-accent data-[current=true]:text-sidebar-accent-foreground',
                           collapsed && 'md:justify-center md:px-0'
                         )}
                       >
-                        {({ isActive }) => (
+                        {() => (
                           <>
-                            {isActive && (
+                            {item.to === activeTo && (
                               <span className='absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-sidebar-primary' />
                             )}
                             <item.icon
                               className={cn(
                                 'size-[18px] shrink-0',
-                                isActive && 'text-sidebar-primary'
+                                item.to === activeTo && 'text-sidebar-primary'
                               )}
                             />
                             <span

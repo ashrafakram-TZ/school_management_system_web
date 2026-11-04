@@ -3,7 +3,7 @@ import { Keyboard, Menu, PanelLeft } from 'lucide-react'
 import { useShortcutHelp } from '@/components/shortcuts/shortcut-context'
 import { Kbd } from '@/components/shortcuts/kbd'
 import { Button } from '@/components/ui/button'
-import { NAV_GROUPS } from '@/config/nav'
+import { currentNav } from '@/config/nav'
 import type { Me } from '@/features/auth/api'
 import { NotificationBell } from './notification-bell'
 import { UserMenu } from './user-menu'
@@ -14,20 +14,10 @@ interface AppHeaderProps {
   onOpenMobile: () => void
 }
 
-const findCurrent = (pathname: string) => {
-  for (const group of NAV_GROUPS) {
-    const item = group.items.find((entry) =>
-      entry.to === '/' ? pathname === '/' : pathname.startsWith(entry.to)
-    )
-    if (item) return { group: group.label, item }
-  }
-  return { group: NAV_GROUPS[0].label, item: NAV_GROUPS[0].items[0] }
-}
-
 export function AppHeader({ me, onToggleSidebar, onOpenMobile }: AppHeaderProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const { setHelpOpen } = useShortcutHelp()
-  const current = findCurrent(pathname)
+  const current = currentNav(pathname)
 
   return (
     <header className='sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-6'>

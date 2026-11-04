@@ -3,6 +3,7 @@ import { io, type Socket } from 'socket.io-client'
 import { config } from '@/config/env'
 import { refreshAccessToken } from '@/lib/api/client'
 import { session } from '@/lib/auth/session'
+import type { FleetAlert } from '@/features/alerts/api'
 
 export type LiveStatus = 'idle' | 'connecting' | 'live' | 'offline'
 export type SubscriptionState = 'pending' | 'live' | 'denied'
@@ -41,9 +42,27 @@ export interface TripEventMessage {
   notified: number
 }
 
+export interface PassengerMessage {
+  trip_id: number
+  route_id: number
+  vehicle_id: number
+  boarding_id: number
+  student_id: number
+  action: 'boarded' | 'alighted'
+  method: 'qr' | 'manual'
+  stop: { id: number; name: string } | null
+  occurred_at: string
+  full_name?: string
+  class_section?: string | null
+}
+
 export interface LiveMessages {
   'trip.position': TripPositionMessage
   'trip.event': TripEventMessage
+  'passenger.boarded': PassengerMessage
+  'passenger.alighted': PassengerMessage
+  'alert.raised': FleetAlert
+  'alert.updated': FleetAlert
 }
 
 type LiveEventName = keyof LiveMessages
@@ -75,6 +94,10 @@ const subscriptions = new Map<string, Subscription>()
 const eventListeners: { [K in LiveEventName]: Set<(message: LiveMessages[K]) => void> } = {
   'trip.position': new Set(),
   'trip.event': new Set(),
+  'passenger.boarded': new Set(),
+  'passenger.alighted': new Set(),
+  'alert.raised': new Set(),
+  'alert.updated': new Set(),
 }
 
 const notify = () => changeListeners.forEach((listener) => listener())
@@ -158,12 +181,10 @@ const open = () => {
   })
   next.on('connect_error', () => setStatus('offline'))
   next.on('error', (payload: { error?: string } | undefined) => void recover(payload))
-  next.on('trip.position', (message: TripPositionMessage) =>
-    eventListeners['trip.position'].forEach((listener) => listener(message))
-  )
-  next.on('trip.event', (message: TripEventMessage) =>
-    eventListeners['trip.event'].forEach((listener) => listener(message))
-  )
+  ;(Object.keys(eventListeners) as LiveEventName[]).forEach((name) => {
+    const listeners = eventListeners[name] as Set<(message: unknown) => void>
+    next.on(name, (message: unknown) => listeners.forEach((listener) => listener(message)))
+  })
   socket = next
 }
 

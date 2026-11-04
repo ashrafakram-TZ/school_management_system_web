@@ -162,7 +162,21 @@ export interface TripRider {
   mode: 'both' | 'pickup' | 'drop'
   passenger_ref: string
   boarded: boolean
+  alighted: boolean
   away_today: boolean
+}
+
+export interface TripBoarding {
+  id: number
+  trip_id: number
+  student_id: number
+  full_name: string
+  class_section: string | null
+  action: 'boarded' | 'alighted'
+  method: 'qr' | 'manual'
+  stop: TripRef | null
+  recorded_by: TripRef | null
+  occurred_at: string
 }
 
 export interface TripDetail extends Trip {
@@ -171,6 +185,7 @@ export interface TripDetail extends Trip {
   events: TripEventRow[]
   riders: TripRider[]
   not_boarded: TripRider[]
+  boardings: TripBoarding[]
 }
 
 export interface TripListParams {
@@ -179,6 +194,113 @@ export interface TripListParams {
   date?: string
   status?: TripStatus
   route_id?: number
+  vehicle_id?: number
+}
+
+export type HealthStatus = 'good' | 'warning' | 'critical' | 'unknown'
+export type Severity = 'low' | 'medium' | 'high'
+export type SafetyKind = 'overspeed' | 'harsh_braking' | 'idle' | 'route_deviation'
+
+export interface LatLng {
+  lat: number
+  lng: number
+}
+
+export interface TrackPoint extends LatLng {
+  at: string
+  speed: number | null
+  heading: number | null
+}
+
+export interface StopArrival extends LatLng {
+  stop_id: number
+  name: string
+  sequence: number
+  status: StopStatus
+  planned_time: string | null
+  arrived_at: string | null
+  departed_at: string | null
+}
+
+export interface SafetyEvent extends LatLng {
+  id: number
+  kind: SafetyKind
+  severity: Severity
+  message: string
+  value: number | null
+  limit: number | null
+  at: string
+  speed_kmh: number | null
+}
+
+export interface TripPlayback {
+  trip: Trip
+  school: LatLng | null
+  path: LatLng[]
+  points: TrackPoint[]
+  total_points: number
+  sampled: boolean
+  distance_km: number
+  duration_seconds: number
+  max_speed: number | null
+  avg_speed: number | null
+  stop_arrivals: StopArrival[]
+  safety_events: SafetyEvent[]
+}
+
+export interface BusRef {
+  id: number
+  registration_no: string
+  name: string
+}
+
+export interface HealthFault {
+  code: string
+  description: string
+  severity: Severity
+  first_seen_at: string | null
+}
+
+export interface VehicleHealth {
+  device_id: number
+  status: HealthStatus
+  reasons: string[]
+  reading_at: string | null
+  battery_v: number | null
+  coolant_c: number | null
+  rpm: number | null
+  fuel_pct: number | null
+  odometer_km: number | null
+  engine_load_pct: number | null
+  faults: HealthFault[]
+}
+
+export interface BusHealth {
+  bus: BusRef
+  has_tracker: boolean
+  open_tickets: number
+  health: VehicleHealth | null
+}
+
+export interface ObdReading {
+  id: string
+  recorded_at: string
+  rpm: number | null
+  speed: number | null
+  coolant_c: number | null
+  engine_load_pct: number | null
+  throttle_pct: number | null
+  fuel_pct: number | null
+  battery_v: number | null
+  odometer_km: number | null
+  dtc: string[]
+}
+
+export interface ObdParams {
+  page: number
+  limit: number
+  from?: string
+  to?: string
 }
 
 export interface StartTripInput {
@@ -192,6 +314,9 @@ export const fleetKeys = {
   positions: (id: number) => [...fleetKeys.all, 'positions', id] as const,
   trips: (params: TripListParams) => [...fleetKeys.all, 'trips', params] as const,
   trip: (id: number) => [...fleetKeys.all, 'trip', id] as const,
+  playback: (id: number) => [...fleetKeys.all, 'playback', id] as const,
+  health: (busId: number) => [...fleetKeys.all, 'health', busId] as const,
+  obd: (busId: number, params: ObdParams) => [...fleetKeys.all, 'obd', busId, params] as const,
 }
 
 const trips = '/admin/transport/trips'
@@ -204,6 +329,11 @@ export const fleetApi = {
   trip: (id: number) => api.get<TripDetail>(`${trips}/${id}`),
   startTrip: (input: StartTripInput) => api.post<TripDetail>(trips, input),
   endTrip: (id: number) => api.post<TripDetail>(`${trips}/${id}/end`),
+  playback: (id: number, maxPoints = 1500) =>
+    api.get<TripPlayback>(`/admin/fleet/trips/${id}/playback`, { max_points: maxPoints }),
+  health: (busId: number) => api.get<BusHealth>(`/admin/fleet/buses/${busId}/health`),
+  obd: (busId: number, params: ObdParams) =>
+    api.get<Paginated<ObdReading>>(`/admin/fleet/buses/${busId}/obd`, { ...params }),
 }
 
 export function useFleetLive(enabled = true) {
@@ -253,5 +383,36 @@ export function useTripMutation<TInput, TResult>(fn: (input: TInput) => Promise<
       void queryClient.invalidateQueries({ queryKey: [...fleetKeys.all, 'trips'] })
       void queryClient.invalidateQueries({ queryKey: [...fleetKeys.all, 'trip'] })
     },
+  })
+}
+
+export function usePlayback(id: number) {
+  return useQuery({
+    queryKey: fleetKeys.playback(id),
+    queryFn: () => fleetApi.playback(id),
+    retry: false,
+    meta: { silent: true },
+  })
+}
+
+export function useBusHealth(busId: number | null) {
+  return useQuery({
+    queryKey: fleetKeys.health(busId ?? 0),
+    queryFn: () => fleetApi.health(busId!),
+    enabled: Boolean(busId),
+    refetchInterval: config.refreshIntervalMs * 3,
+    retry: false,
+    meta: { silent: true },
+  })
+}
+
+export function useObdLog(busId: number | null, params: ObdParams) {
+  return useQuery({
+    queryKey: fleetKeys.obd(busId ?? 0, params),
+    queryFn: () => fleetApi.obd(busId!, params),
+    enabled: Boolean(busId),
+    placeholderData: keepPreviousData,
+    retry: false,
+    meta: { silent: true },
   })
 }

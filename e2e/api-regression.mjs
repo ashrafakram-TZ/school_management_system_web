@@ -2146,6 +2146,127 @@ await CB('API-CB-06', 'POST', '/admin/substitutes/combine', 'AO splits boys and 
   return `200, ${period.combined_into.map((item) => `${item.group} ${item.students} -> ${item.section.name}`).join(', ')}; removed`
 })
 
+const SP = (id, method, endpoint, scenario, expected, fn) =>
+  check({ id, module: 'Sports and activities', method, endpoint, scenario, expected, day: 'Sports' }, fn)
+await SP('API-SP-01', 'POST', '/admin/students/:id/achievements', 'Sports achievement without indoor or outdoor', '400 on venue_type', async () =>
+  expectFields(
+    await admin('POST', `/admin/students/${studentId}/achievements`, { title: 'Sports day sprint', category: 'sports', achieved_on: TODAY_IST }),
+    ['venue_type']
+  )
+)
+await SP('API-SP-02', 'POST', '/admin/students/:id/achievements', 'District inter-school team winner scores 20 points', '201, points 20, team name kept', async () => {
+  const result = await admin('POST', `/admin/students/${studentId}/achievements`, {
+    title: `Regression football ${RUN}`,
+    category: 'sports',
+    level: 'district',
+    result: 'winner',
+    event_scope: 'inter_school',
+    venue_type: 'outdoor',
+    participation: 'team',
+    team_name: 'U-14 team',
+    prize_received: 'Trophy',
+    school_reward: 'Medal',
+    achieved_on: TODAY_IST,
+  })
+  expectStatus(result, 201)
+  if (result.body.data.points !== 20) throw new Error(`points ${result.body.data.points}`)
+  if (result.body.data.team_name !== 'U-14 team') throw new Error('team name lost')
+  return `201, ${result.body.data.points} points`
+})
+await SP('API-SP-03', 'GET', '/admin/achievements/leaderboard', 'Sports leaderboard', '200, ranked by points, equal points share a rank', async () => {
+  const result = await admin('GET', '/admin/achievements/leaderboard?category=sports&limit=50')
+  expectStatus(result, 200)
+  const rows = result.body.data.rows
+  for (let index = 1; index < rows.length; index += 1) {
+    if (rows[index].points > rows[index - 1].points) throw new Error('Not sorted by points')
+    if (rows[index].points === rows[index - 1].points && rows[index].rank !== rows[index - 1].rank) throw new Error('Tie not shared')
+  }
+  if (!rows.some((row) => row.student.id === studentId)) throw new Error('New winner missing')
+  return `200, ${rows.length} students, top ${rows[0]?.student.name} ${rows[0]?.points} pts`
+})
+await SP('API-SP-04', 'GET', '/admin/achievements', 'Filter inter-school podium finishes', '200, only inter-school top 3 results', async () => {
+  const result = await admin('GET', '/admin/achievements?event_scope=inter_school&result=podium&limit=50')
+  expectStatus(result, 200)
+  const bad = result.body.data.items.find((item) => item.event_scope !== 'inter_school' || item.result === 'participated')
+  if (bad) throw new Error(`Unexpected ${bad.title}`)
+  return `200, ${result.body.data.total} achievements`
+})
+await SP('API-SP-05', 'GET', '/admin/achievements', 'Unknown sort', '400 INVALID_SORT', async () =>
+  expectStatus(await admin('GET', '/admin/achievements?sort=nope'), 400, 'INVALID_SORT')
+)
+await SP('API-SP-06', 'GET', '/admin/achievements/insights', 'Insight counts', '200 with sports, wins, outside school', async () => {
+  const result = await admin('GET', '/admin/achievements/insights')
+  expectStatus(result, 200)
+  const data = result.body.data
+  if (data.sports > data.total || data.wins > data.total) throw new Error(JSON.stringify(data))
+  return `200, ${JSON.stringify(data)}`
+})
+await SP('API-SP-07', 'GET', '/mobile/teacher/sections/:id/activity-ranking', 'Teacher sees my section activity ranking', '200', async () => {
+  if (!teacherSection) return 'Skipped: teacher has no section'
+  return expectStatus(await teacher('GET', `/mobile/teacher/sections/${teacherSection}/activity-ranking`), 200)
+})
+
+const D7 = (id, module, method, endpoint, scenario, expected, fn) =>
+  check({ id, module, method, endpoint, scenario, expected, day: 'Day 7' }, fn)
+const vehicles = (await admin('GET', '/admin/transport/vehicles?limit=5')).body?.data?.items ?? []
+const vehicle = vehicles[0]
+await D7('API-D7-01', 'Boarding', 'POST', '/mobile/driver/trips/:id/boardings', 'Parent tries to mark boarding', '403 FORBIDDEN', async () =>
+  expectStatus(await parent('POST', '/mobile/driver/trips/1/boardings', { action: 'boarded', student_id: 1 }), 403)
+)
+await D7('API-D7-02', 'SOS', 'POST', '/mobile/driver/sos', 'Parent presses SOS', '403 FORBIDDEN', async () =>
+  expectStatus(await parent('POST', '/mobile/driver/sos', {}), 403)
+)
+await D7('API-D7-03', 'Alerts', 'GET', '/admin/fleet/alerts', 'Alerts centre list and insights', '200 paginated and counts', async () => {
+  const list = await admin('GET', '/admin/fleet/alerts?limit=5')
+  expectStatus(list, 200)
+  expectStatus(await admin('GET', '/admin/fleet/alerts/insights'), 200)
+  return `200, ${list.body.data.total} alerts`
+})
+await D7('API-D7-04', 'Alerts', 'POST', '/admin/fleet/alerts/:id/resolve', 'Resolve without a note', '400 on resolution_note', async () => {
+  const open = (await admin('GET', '/admin/fleet/alerts?limit=1')).body.data.items[0]
+  return expectFields(await admin('POST', `/admin/fleet/alerts/${open?.id ?? 999999}/resolve`, {}), ['resolution_note'])
+})
+await D7('API-D7-05', 'Alerts', 'POST', '/admin/fleet/alerts/:id/acknowledge', 'Alert that does not exist', '404 ALERT_NOT_FOUND', async () =>
+  expectStatus(await admin('POST', '/admin/fleet/alerts/999999/acknowledge'), 404, 'ALERT_NOT_FOUND')
+)
+await D7('API-D7-06', 'Alerts', 'POST', '/admin/fleet/alerts/:id/resolve', 'AO (view only) tries to resolve', '403 FORBIDDEN', async () =>
+  expectStatus(await ao('POST', '/admin/fleet/alerts/999999/resolve', { resolution_note: 'Handled' }), 403)
+)
+await D7('API-D7-07', 'Maintenance', 'POST', '/admin/fleet/maintenance', 'Ticket with nothing filled', '400 on vehicle_id, title', async () =>
+  expectFields(await admin('POST', '/admin/fleet/maintenance', {}), ['vehicle_id', 'title'])
+)
+await D7('API-D7-08', 'Maintenance', 'GET', '/admin/fleet/maintenance', 'Tickets list and insights', '200', async () => {
+  expectStatus(await admin('GET', '/admin/fleet/maintenance/insights'), 200)
+  return expectStatus(await admin('GET', '/admin/fleet/maintenance?limit=5'), 200)
+})
+await D7('API-D7-09', 'Fuel log', 'POST', '/admin/fleet/fuel', 'Fuel entry with nothing filled', '400 on vehicle_id, filled_on, litres, amount, odometer_km', async () =>
+  expectFields(await admin('POST', '/admin/fleet/fuel', {}), ['vehicle_id', 'filled_on', 'litres', 'amount', 'odometer_km'])
+)
+await D7('API-D7-10', 'Fuel log', 'POST', '/admin/fleet/fuel', 'Fuel entry dated in the future', '400 on filled_on', async () => {
+  if (!vehicle) return 'Skipped: no bus'
+  const future = new Date(Date.now() + 5.5 * 3600 * 1000 + 3 * 86400000).toISOString().slice(0, 10)
+  return expectFields(
+    await admin('POST', '/admin/fleet/fuel', { vehicle_id: vehicle.id, filled_on: future, litres: 40, amount: 3800, odometer_km: 99999 }),
+    ['filled_on']
+  )
+})
+await D7('API-D7-11', 'Vehicle health', 'GET', '/admin/fleet/buses/:id/health', 'Health card of a bus', '200 with status', async () => {
+  if (!vehicle) return 'Skipped: no bus'
+  const result = await admin('GET', `/admin/fleet/buses/${vehicle.id}/health`)
+  expectStatus(result, 200)
+  return `200, ${result.body.data.status}`
+})
+await D7('API-D7-12', 'Playback', 'GET', '/admin/fleet/trips/:id/playback', 'Replay of the latest ended trip', '200 with points in time order', async () => {
+  const ended = (await admin('GET', '/admin/transport/trips?limit=1&status=ended')).body.data.items[0]
+  if (!ended) return 'Skipped: no ended trip'
+  const result = await admin('GET', `/admin/fleet/trips/${ended.id}/playback`)
+  expectStatus(result, 200)
+  const points = result.body.data.points ?? result.body.data.track ?? []
+  for (let index = 1; index < points.length; index += 1)
+    if (new Date(points[index].at ?? points[index].time) < new Date(points[index - 1].at ?? points[index - 1].time)) throw new Error('Points out of order')
+  return `200, ${points.length} points`
+})
+
 await admin('DELETE', `/admin/students/${studentId}`)
 if (userId) await admin('DELETE', `/admin/users/${userId}`)
 

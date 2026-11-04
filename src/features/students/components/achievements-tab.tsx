@@ -5,7 +5,8 @@ import { Combobox } from '@/components/common/combobox'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { EmptyState, ErrorState } from '@/components/common/display'
 import { FormField } from '@/components/common/form-field'
-import { Badge, type BadgeTone } from '@/components/ui/badge'
+import { SegmentedControl } from '@/components/common/segmented-control'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,6 +15,17 @@ import { alerts } from '@/lib/alerts'
 import { toApiError } from '@/lib/api/errors'
 import { filesApi, openFile } from '@/lib/files'
 import { formatDate } from '@/lib/format'
+import {
+  CATEGORY_LABELS,
+  LEVEL_LABELS,
+  LEVEL_TONE,
+  optionsOf,
+  PARTICIPATION_LABELS,
+  RESULT_LABELS,
+  RESULT_TONE,
+  SCOPE_LABELS,
+  VENUE_LABELS,
+} from '../achievement-labels'
 import { useStudentMutation } from '../api'
 import {
   recordsApi,
@@ -22,37 +34,11 @@ import {
   type AchievementCategory,
   type AchievementInput,
   type AchievementLevel,
+  type AchievementResult,
+  type EventScope,
+  type Participation,
+  type VenueType,
 } from '../records-api'
-
-const CATEGORY_LABELS: Record<AchievementCategory, string> = {
-  academic: 'Academic',
-  sports: 'Sports',
-  arts: 'Arts',
-  cultural: 'Cultural',
-  competition: 'Competition',
-  leadership: 'Leadership',
-  other: 'Other',
-}
-
-const LEVEL_LABELS: Record<AchievementLevel, string> = {
-  class: 'Class',
-  school: 'School',
-  zone: 'Zone',
-  district: 'District',
-  state: 'State',
-  national: 'National',
-  international: 'International',
-}
-
-const LEVEL_TONE: Record<AchievementLevel, BadgeTone> = {
-  class: 'neutral',
-  school: 'neutral',
-  zone: 'info',
-  district: 'info',
-  state: 'success',
-  national: 'success',
-  international: 'success',
-}
 
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 
@@ -105,7 +91,16 @@ export function AchievementsTab({
                 <div className='flex flex-wrap items-center gap-1.5'>
                   <Badge tone='info'>{CATEGORY_LABELS[item.category]}</Badge>
                   <Badge tone={LEVEL_TONE[item.level]}>{LEVEL_LABELS[item.level]} level</Badge>
+                  <Badge tone={RESULT_TONE[item.result]}>{RESULT_LABELS[item.result]}</Badge>
+                  <Badge tone='neutral'>{SCOPE_LABELS[item.event_scope]}</Badge>
+                  {item.venue_type && <Badge tone='neutral'>{VENUE_LABELS[item.venue_type]}</Badge>}
+                  {item.participation === 'team' && (
+                    <Badge tone='neutral'>
+                      {item.team_name ? `Team · ${item.team_name}` : 'Team'}
+                    </Badge>
+                  )}
                   {item.position && <Badge tone='warning'>{item.position}</Badge>}
+                  <Badge tone='warning'>{item.points} pts</Badge>
                   {!item.visible_to_parent && (
                     <Badge tone='neutral'>
                       <EyeOff className='size-3' />
@@ -113,6 +108,22 @@ export function AchievementsTab({
                     </Badge>
                   )}
                 </div>
+                {(item.prize_received || item.school_reward) && (
+                  <dl className='grid gap-0.5 text-sm'>
+                    {item.prize_received && (
+                      <div className='flex gap-1.5'>
+                        <dt className='text-muted-foreground'>Prize won:</dt>
+                        <dd className='font-medium'>{item.prize_received}</dd>
+                      </div>
+                    )}
+                    {item.school_reward && (
+                      <div className='flex gap-1.5'>
+                        <dt className='text-muted-foreground'>From school:</dt>
+                        <dd className='font-medium'>{item.school_reward}</dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
                 {item.description && <p className='text-sm'>{item.description}</p>}
                 <div className='flex flex-wrap items-center justify-between gap-2'>
                   <span className='text-xs text-muted-foreground'>
@@ -205,6 +216,13 @@ function AchievementModal({
     title: achievement?.title ?? '',
     category: achievement?.category ?? ('competition' as AchievementCategory),
     level: achievement?.level ?? ('school' as AchievementLevel),
+    result: achievement?.result ?? ('participated' as AchievementResult),
+    event_scope: achievement?.event_scope ?? ('in_school' as EventScope),
+    venue_type: achievement?.venue_type ?? (null as VenueType | null),
+    participation: achievement?.participation ?? ('individual' as Participation),
+    team_name: achievement?.team_name ?? '',
+    prize_received: achievement?.prize_received ?? '',
+    school_reward: achievement?.school_reward ?? '',
     position: achievement?.position ?? '',
     achieved_on: achievement?.achieved_on ?? today(),
     description: achievement?.description ?? '',
@@ -246,6 +264,8 @@ function AchievementModal({
             next.title = 'Enter the achievement, at least 3 letters'
           if (!draft.achieved_on) next.achieved_on = 'Choose the date'
           if (draft.achieved_on > today()) next.achieved_on = 'The date cannot be in the future'
+          if (draft.category === 'sports' && !draft.venue_type)
+            next.venue_type = 'Choose indoor or outdoor for a sports achievement'
           if (Object.keys(next).length) {
             setErrors(next)
             return
@@ -255,6 +275,13 @@ function AchievementModal({
               title: draft.title.trim(),
               category: draft.category,
               level: draft.level,
+              result: draft.result,
+              event_scope: draft.event_scope,
+              venue_type: draft.venue_type,
+              participation: draft.participation,
+              team_name: draft.participation === 'team' ? draft.team_name.trim() || null : null,
+              prize_received: draft.prize_received.trim() || null,
+              school_reward: draft.school_reward.trim() || null,
               position: draft.position.trim() || null,
               achieved_on: draft.achieved_on,
               description: draft.description.trim() || null,
@@ -285,7 +312,7 @@ function AchievementModal({
           <Input
             id='achievement-title'
             maxLength={120}
-            placeholder='District level chess championship'
+            placeholder='Inter-school football tournament'
             value={draft.title}
             onChange={(event) => set('title', event.target.value)}
             aria-invalid={Boolean(errors.title) || undefined}
@@ -297,10 +324,7 @@ function AchievementModal({
             label='Category'
             value={draft.category}
             placeholder='Choose category'
-            options={(Object.keys(CATEGORY_LABELS) as AchievementCategory[]).map((value) => ({
-              value,
-              label: CATEGORY_LABELS[value],
-            }))}
+            options={optionsOf(CATEGORY_LABELS)}
             onChange={(value) => value && set('category', value as AchievementCategory)}
             className='sm:w-full'
           />
@@ -311,19 +335,88 @@ function AchievementModal({
             label='Level'
             value={draft.level}
             placeholder='Choose level'
-            options={(Object.keys(LEVEL_LABELS) as AchievementLevel[]).map((value) => ({
-              value,
-              label: LEVEL_LABELS[value],
-            }))}
+            options={optionsOf(LEVEL_LABELS)}
             onChange={(value) => value && set('level', value as AchievementLevel)}
             className='sm:w-full'
           />
         </FormField>
-        <FormField
-          id='achievement-position'
-          label='Position'
-          hint='Optional, like 1st place or Runner-up'
-        >
+        <FormField id='achievement-result' label='Result' required>
+          <Combobox
+            id='achievement-result'
+            label='Result'
+            value={draft.result}
+            placeholder='Choose result'
+            options={optionsOf(RESULT_LABELS)}
+            onChange={(value) => value && set('result', value as AchievementResult)}
+            className='sm:w-full'
+          />
+        </FormField>
+        <FormField id='achievement-scope' label='Event' required>
+          <Combobox
+            id='achievement-scope'
+            label='Event'
+            value={draft.event_scope}
+            placeholder='Choose event'
+            options={optionsOf(SCOPE_LABELS)}
+            onChange={(value) => value && set('event_scope', value as EventScope)}
+            className='sm:w-full'
+          />
+        </FormField>
+        {draft.category === 'sports' && (
+          <FormField
+            id='achievement-venue'
+            label='Indoor or outdoor'
+            required
+            error={errors.venue_type}
+          >
+            <SegmentedControl
+              label='Indoor or outdoor'
+              value={draft.venue_type ?? ''}
+              onChange={(value) => set('venue_type', value as VenueType)}
+              options={optionsOf(VENUE_LABELS)}
+              className='w-fit'
+            />
+          </FormField>
+        )}
+        <FormField id='achievement-participation' label='Took part as'>
+          <SegmentedControl
+            label='Took part as'
+            value={draft.participation}
+            onChange={(value) => set('participation', value as Participation)}
+            options={optionsOf(PARTICIPATION_LABELS)}
+            className='w-fit'
+          />
+        </FormField>
+        {draft.participation === 'team' && (
+          <FormField id='achievement-team' label='Team name' hint='Optional'>
+            <Input
+              id='achievement-team'
+              maxLength={80}
+              placeholder='School U-14 football team'
+              value={draft.team_name}
+              onChange={(event) => set('team_name', event.target.value)}
+            />
+          </FormField>
+        )}
+        <FormField id='achievement-prize' label='Prize won' hint='Optional, what the event gave'>
+          <Input
+            id='achievement-prize'
+            maxLength={120}
+            placeholder='Gold medal and ₹2,000'
+            value={draft.prize_received}
+            onChange={(event) => set('prize_received', event.target.value)}
+          />
+        </FormField>
+        <FormField id='achievement-reward' label='Prize from school' hint='Optional'>
+          <Input
+            id='achievement-reward'
+            maxLength={120}
+            placeholder='Trophy at the annual day'
+            value={draft.school_reward}
+            onChange={(event) => set('school_reward', event.target.value)}
+          />
+        </FormField>
+        <FormField id='achievement-position' label='Position' hint='Optional, like 1st of 40 teams'>
           <Input
             id='achievement-position'
             maxLength={30}

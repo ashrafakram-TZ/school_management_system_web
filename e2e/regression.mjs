@@ -1968,7 +1968,7 @@ await TA(
   page = previous
 }
 {
-  const state = JSON.parse(fs.readFileSync(path.join(ROOT, '.auth-super.json'), 'utf8'))
+  const state = await superAdmin.context.storageState()
   for (const origin of state.origins)
     origin.localStorage = origin.localStorage.filter((item) => item.name !== 'tz-school-id')
   const fresh = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: state })
@@ -1999,6 +1999,138 @@ await TA(
   await fresh.close()
   page = previous
 }
+await TA(
+  {
+    id: 'SP-01',
+    module: 'Sports and activities',
+    type: 'View',
+    title: 'Sports leaderboard shows the top 3 and ranks',
+    steps: 'Open Sports & activities, choose Sports.',
+    expected: 'Top 3 · Sports and the ranked table',
+  },
+  async () => {
+    await go('/activities?category=sports')
+    await page.getByRole('tab', { name: 'Leaderboard' }).waitFor({ timeout: 8000 })
+    await see('Points')
+  }
+)
+await TA(
+  {
+    id: 'SP-02',
+    module: 'Sports and activities',
+    type: 'Filter',
+    title: 'Wins card filters the achievements list',
+    steps: 'Click the Wins card.',
+    expected: 'All achievements tab with only Winner results',
+  },
+  async () => {
+    await go('/activities')
+    await page.locator('div.grid.grid-cols-2 > button[aria-pressed]', { hasText: 'Wins' }).click()
+    await page.getByRole('tab', { name: /All achievements/ }).waitFor()
+    await page.waitForTimeout(800)
+    const results = await page.locator('table tbody tr td:nth-child(4)').allInnerTexts()
+    if (results.some((text) => text.trim() && text.trim() !== 'Winner')) throw new Error(results.join(','))
+  }
+)
+await TA(
+  {
+    id: 'SP-03',
+    module: 'Sports and activities',
+    type: 'Validation',
+    title: 'A sports achievement needs indoor or outdoor',
+    steps: 'Student, Achievements, Add, category Sports, Save without indoor/outdoor.',
+    expected: '"Choose indoor or outdoor for a sports achievement"',
+  },
+  async () => {
+    const target = (await api('GET', '/admin/students?limit=1')).data.items[0]
+    await go(`/students/${target.id}?tab=achievements`)
+    await click(page, 'Add achievement')
+    await fill(dialog(), 'Achievement', 'Sports day sprint')
+    await pick(dialog(), 'Category', 'Sports')
+    await dialog().getByRole('button', { name: 'Save' }).click()
+    await see('Choose indoor or outdoor for a sports achievement', dialog())
+  }
+)
+await TA(
+  {
+    id: 'SP-04',
+    module: 'Sports and activities',
+    type: 'View',
+    title: 'Dashboard shows sports stars',
+    steps: 'Open the dashboard.',
+    expected: '"Sports stars" card',
+  },
+  async () => {
+    await go('/')
+    await see('Sports stars')
+  }
+)
+const D7W = (meta, fn) => test({ ...meta, day: 'Day 7' }, fn)
+await D7W(
+  {
+    id: 'D7-01',
+    module: 'Alerts',
+    type: 'View',
+    title: 'Alerts centre is live with insight cards',
+    steps: 'Open Fleet, Alerts.',
+    expected: 'Live badge and the SOS active card; menu shows Alerts as current',
+  },
+  async () => {
+    await go('/fleet/alerts')
+    await see('SOS active')
+    const current = page.locator('nav a[data-current="true"]')
+    if ((await current.count()) !== 1 || !(await current.innerText()).includes('Alerts'))
+      throw new Error('Menu highlight is not only Alerts')
+  }
+)
+await D7W(
+  {
+    id: 'D7-02',
+    module: 'Maintenance',
+    type: 'Validation',
+    title: 'A maintenance ticket needs a bus and a title',
+    steps: 'Maintenance, Add ticket, save empty.',
+    expected: 'Field errors shown in the modal',
+  },
+  async () => {
+    await go('/fleet/maintenance')
+    await page.getByRole('button', { name: /^Add ticket/ }).first().click()
+    await dialog().getByRole('button', { name: /Save|Add ticket|Create/ }).last().click()
+    await dialog().locator('[aria-invalid="true"], .text-destructive').first().waitFor({ timeout: 8000 })
+  }
+)
+await D7W(
+  {
+    id: 'D7-03',
+    module: 'Fuel log',
+    type: 'View',
+    title: 'Fuel log tab opens',
+    steps: 'Maintenance, Fuel log.',
+    expected: 'Fuel log tab selected',
+  },
+  async () => {
+    await go('/fleet/maintenance?tab=fuel')
+    await page.getByRole('tab', { name: 'Fuel log', selected: true }).waitFor({ timeout: 8000 })
+  }
+)
+await D7W(
+  {
+    id: 'D7-04',
+    module: 'Playback',
+    type: 'View',
+    title: 'Trip history opens the replay',
+    steps: 'Trip history, open the latest trip replay.',
+    expected: 'Replay page with the map and timeline',
+  },
+  async () => {
+    const ended = (await api('GET', '/admin/transport/trips?limit=1&status=ended')).data?.items?.[0]
+    await go('/fleet/history')
+    await see('Trip history')
+    if (!ended) return
+    await go(`/fleet/trips/${ended.id}/playback`)
+    await see('Timeline')
+  }
+)
 {
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -2018,6 +2150,9 @@ await TA(
     ['RS-09', '/fleet', 'Trips today'],
     ['RS-10', '/exams', 'Marks entry'],
     ['RS-11', '/fees', 'Fee plans'],
+    ['RS-12', '/activities', 'Leaderboard'],
+    ['RS-13', '/fleet/alerts', 'SOS active'],
+    ['RS-14', '/fleet/maintenance', 'Tickets'],
   ]) {
     await test(
       {

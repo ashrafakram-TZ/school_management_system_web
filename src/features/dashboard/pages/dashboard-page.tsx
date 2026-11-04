@@ -14,7 +14,9 @@ import { Page, PageHeader } from '@/components/common/page'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { SosBanner } from '@/features/alerts/components/sos-banner'
 import { can, useMe } from '@/features/auth/api'
+import { SportsStarsCard } from '@/features/activities/components/sports-stars-card'
 import { TopRankHoldersCard } from '@/features/exams/components/top-rank-holders-card'
 import { useFleetLive, VEHICLE_STATE } from '@/features/fleet/api'
 import { useStaffInsights } from '@/features/staff/api'
@@ -38,6 +40,7 @@ export function DashboardPage() {
         title={`Good ${greeting()}, ${firstName}`}
         description='Today at a glance: students, admissions, staff and buses.'
       />
+      {can(me, 'fleet.view') && <SosBanner />}
       <div className='grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4'>
         {can(me, 'students.view') && <StudentTiles />}
         {can(me, 'staff.view') && <StaffTile />}
@@ -45,6 +48,7 @@ export function DashboardPage() {
       </div>
       {can(me, 'fleet.view') && <BusMap />}
       {can(me, 'exams.view') && <TopRankHoldersCard />}
+      {can(me, 'students.view') && <SportsStarsCard />}
     </Page>
   )
 }
