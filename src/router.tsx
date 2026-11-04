@@ -13,6 +13,7 @@ import { queryClient } from '@/lib/api/query-client'
 import { session } from '@/lib/auth/session'
 import { attendanceSearchSchema } from '@/features/attendance/search'
 import { GeneralErrorPage, NotFoundPage } from '@/features/errors/error-pages'
+import { meetingsSearchSchema } from '@/features/meetings/search'
 import { outboxSearchSchema } from '@/features/notifications/search'
 import { setupSearchSchema } from '@/features/setup/search'
 import {
@@ -79,6 +80,16 @@ const usersRoute = createRoute({
   path: '/users',
   validateSearch: usersSearchSchema,
   component: lazyRouteComponent(() => import('@/features/users/pages/users-page'), 'UsersPage'),
+})
+
+const meetingsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/meetings',
+  validateSearch: meetingsSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/meetings/pages/meetings-page'),
+    'MeetingsPage'
+  ),
 })
 
 const notificationsRoute = createRoute({
@@ -341,6 +352,7 @@ const routeTree = rootRoute.addChildren([
     schoolsRoute,
     usersRoute,
     notificationsRoute,
+    meetingsRoute,
     fleetRoute,
     tripRoute,
     tripPlaybackRoute,

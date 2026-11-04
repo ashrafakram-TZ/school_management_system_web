@@ -20,6 +20,7 @@ import {
   Trophy,
   Truck,
   UsersRound,
+  Video,
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
@@ -41,6 +42,7 @@ export type NavPath =
   | '/activities'
   | '/transport'
   | '/notifications'
+  | '/meetings'
   | '/fleet'
   | '/fleet/alerts'
   | '/fleet/history'
@@ -197,6 +199,14 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: BellRing,
         shortcut: 'nav.notifications',
         permission: 'notifications.view',
+      },
+      {
+        to: '/meetings',
+        label: 'Meetings',
+        description: 'Teacher and parent video meetings, who booked whom and the call log',
+        icon: Video,
+        shortcut: 'nav.meetings',
+        permission: 'meetings.view',
       },
     ],
   },
