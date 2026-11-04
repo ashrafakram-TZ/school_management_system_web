@@ -1,0 +1,209 @@
+import { getRouteApi, useNavigate } from '@tanstack/react-router'
+import { CircleOff, Clock, Flag, MessagesSquare, MessageSquareText } from 'lucide-react'
+import { DataTable, type Column } from '@/components/common/data-table'
+import { InsightCards, type Insight } from '@/components/common/insight-cards'
+import { ListToolbar, SearchBox } from '@/components/common/list-toolbar'
+import { Page, PageHeader } from '@/components/common/page'
+import { useShortcut } from '@/components/shortcuts/shortcut-context'
+import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import { formatDateTime } from '@/lib/format'
+import { useChatInsights, useChatThreads, type ChatThread } from '../api'
+import { ChatThreadSheet } from '../components/chat-thread-sheet'
+import type { ChatSearch } from '../search'
+
+const route = getRouteApi('/_app/chat')
+const LIMIT = 20
+
+export function ChatPage() {
+  const search = route.useSearch()
+  const navigate = useNavigate({ from: '/chat' })
+  const { thread: openId, ...filters } = search
+  const threads = useChatThreads({ ...filters, limit: LIMIT })
+  const insights = useChatInsights()
+  const rows = threads.data?.items ?? []
+
+  const setSearch = (patch: Partial<ChatSearch>) =>
+    navigate({ search: (prev) => ({ ...prev, page: 1, ...patch }), replace: true })
+  const open = (id: number | undefined) =>
+    navigate({ search: (prev) => ({ ...prev, thread: id }), replace: true })
+
+  useShortcut('app.refresh', () => {
+    void threads.refetch()
+    void insights.refetch()
+  })
+
+  const data = insights.data
+  const cards: Insight[] = [
+    {
+      key: 'all',
+      label: 'Conversations',
+      value: data?.threads ?? 0,
+      hint: 'This academic year',
+      icon: MessagesSquare,
+      tone: 'primary',
+      active: !search.flagged,
+      onClick: () => setSearch({ flagged: undefined }),
+    },
+    {
+      key: 'reported',
+      label: 'Reported messages',
+      value: data?.open_flags ?? 0,
+      hint: `${data?.hidden ?? 0} hidden so far`,
+      icon: Flag,
+      tone: 'danger',
+      active: Boolean(search.flagged),
+      onClick: () => setSearch({ flagged: search.flagged ? undefined : true }),
+    },
+    {
+      key: 'today',
+      label: 'Active today',
+      value: data?.active_today ?? 0,
+      hint: `${data?.messages_today ?? 0} messages today`,
+      icon: MessageSquareText,
+      tone: 'success',
+    },
+    {
+      key: 'held',
+      label: 'Waiting for office hours',
+      value: data?.held ?? 0,
+      hint: 'Parent messages sent after hours',
+      icon: Clock,
+      tone: 'warning',
+    },
+  ]
+
+  const columns: Column<ChatThread>[] = [
+    {
+      key: 'people',
+      header: 'Teacher ↔ Parent',
+      cell: (row) => (
+        <span className='grid min-w-0'>
+          <span className='font-semibold break-words'>
+            {row.teacher.name} ↔ {row.parent.name}
+          </span>
+          <span className='text-xs text-muted-foreground capitalize'>{row.parent.label}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'student',
+      header: 'About',
+      cell: (row) => (
+        <span className='grid min-w-0'>
+          <span className='font-medium break-words'>{row.student.name}</span>
+          <span className='text-xs text-muted-foreground'>{row.class_section ?? 'Not placed'}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'last',
+      header: 'Last message',
+      sortKey: 'last_message_at',
+      hideBelow: 'lg',
+      cell: (row) => (
+        <span className='grid min-w-0'>
+          <span className='line-clamp-1 text-sm'>{row.last_message_preview ?? '—'}</span>
+          <span className='tabular text-xs text-muted-foreground'>
+            {formatDateTime(row.last_message_at)}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'count',
+      header: 'Messages',
+      sortKey: 'message_count',
+      hideBelow: 'xl',
+      align: 'right',
+      cell: (row) => <span className='tabular text-sm'>{row.message_count}</span>,
+    },
+    {
+      key: 'flags',
+      header: 'Reports',
+      sortKey: 'open_flags',
+      cell: (row) =>
+        row.open_flags ? (
+          <Badge tone='danger' dot>
+            {row.open_flags} reported
+          </Badge>
+        ) : (
+          <Badge tone='neutral'>None</Badge>
+        ),
+    },
+  ]
+
+  const filtered = Boolean(search.search || search.flagged)
+
+  return (
+    <Page>
+      <PageHeader
+        eyebrow='Communication'
+        title='Chat audit'
+        description='Teacher and parent conversations this academic year. Read them, handle reported messages and hide what does not belong. Every visit is recorded.'
+      />
+
+      <InsightCards items={cards} loading={insights.isPending} />
+
+      <Card className='overflow-hidden'>
+        <ListToolbar
+          summary={threads.data ? `${threads.data.total} conversations` : ''}
+          onClear={filtered ? () => navigate({ search: { page: 1 }, replace: true }) : undefined}
+        >
+          <SearchBox
+            value={search.search ?? ''}
+            onChange={(value) => setSearch({ search: value || undefined })}
+            placeholder='Teacher, parent or student'
+            label='Search conversations'
+          />
+        </ListToolbar>
+
+        <DataTable
+          rows={rows}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={threads.isFetching}
+          error={threads.isError ? threads.error.message : null}
+          onRetry={() => threads.refetch()}
+          onRowClick={(row) => open(row.id)}
+          sort={{ sort: search.sort ?? 'last_message_at', order: search.order ?? 'desc' }}
+          onSortChange={(next) => setSearch(next as Partial<ChatSearch>)}
+          empty={{
+            icon: filtered ? CircleOff : MessagesSquare,
+            title: filtered ? 'No conversations match' : 'No conversations yet',
+            description: filtered
+              ? 'Try another name, or clear the filters.'
+              : 'When a teacher and a parent start chatting in the app, the conversation shows up here.',
+          }}
+          card={(row) => (
+            <div className='grid gap-1.5'>
+              <div className='flex items-start justify-between gap-2'>
+                <span className='font-bold break-words'>
+                  {row.teacher.name} ↔ {row.parent.name}
+                </span>
+                {row.open_flags > 0 && (
+                  <Badge tone='danger' dot>
+                    {row.open_flags}
+                  </Badge>
+                )}
+              </div>
+              <span className='text-xs text-muted-foreground'>
+                About {row.student.name} · {row.message_count} messages
+              </span>
+              <span className='line-clamp-1 text-sm'>{row.last_message_preview ?? ''}</span>
+            </div>
+          )}
+          pagination={{
+            page: search.page,
+            limit: LIMIT,
+            total: threads.data?.total ?? 0,
+            label: 'conversations',
+            onPageChange: (page) => navigate({ search: (prev) => ({ ...prev, page }) }),
+          }}
+        />
+      </Card>
+
+      <ChatThreadSheet threadId={openId ?? null} onClose={() => open(undefined)} />
+    </Page>
+  )
+}

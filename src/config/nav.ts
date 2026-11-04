@@ -22,6 +22,9 @@ import {
   Truck,
   UsersRound,
   Video,
+  BookOpenCheck,
+  Megaphone,
+  MessagesSquare,
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
@@ -45,6 +48,9 @@ export type NavPath =
   | '/transport'
   | '/notifications'
   | '/meetings'
+  | '/diary'
+  | '/announcements'
+  | '/chat'
   | '/fleet'
   | '/fleet/alerts'
   | '/fleet/history'
@@ -217,6 +223,30 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Video,
         shortcut: 'nav.meetings',
         permission: 'meetings.view',
+      },
+      {
+        to: '/diary',
+        label: 'Diary',
+        description: 'Homework, remarks and feedback to parents, with review',
+        icon: BookOpenCheck,
+        shortcut: 'nav.diary',
+        permission: 'diary.view',
+      },
+      {
+        to: '/announcements',
+        label: 'Announcements',
+        description: 'Notices to parents, staff or classes, and who read them',
+        icon: Megaphone,
+        shortcut: 'nav.announcements',
+        permission: 'announcements.view',
+      },
+      {
+        to: '/chat',
+        label: 'Chat audit',
+        description: 'Teacher and parent conversations and reported messages',
+        icon: MessagesSquare,
+        shortcut: 'nav.chat',
+        permission: 'chat.audit',
       },
     ],
   },

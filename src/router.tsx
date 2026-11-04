@@ -14,6 +14,9 @@ import { session } from '@/lib/auth/session'
 import { attendanceSearchSchema } from '@/features/attendance/search'
 import { GeneralErrorPage, NotFoundPage } from '@/features/errors/error-pages'
 import { meetingsSearchSchema } from '@/features/meetings/search'
+import { diarySearchSchema } from '@/features/diary/search'
+import { announcementsSearchSchema } from '@/features/announcements/search'
+import { chatSearchSchema } from '@/features/chat/search'
 import { outboxSearchSchema } from '@/features/notifications/search'
 import { setupSearchSchema } from '@/features/setup/search'
 import {
@@ -91,6 +94,30 @@ const meetingsRoute = createRoute({
     () => import('@/features/meetings/pages/meetings-page'),
     'MeetingsPage'
   ),
+})
+
+const diaryRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/diary',
+  validateSearch: diarySearchSchema,
+  component: lazyRouteComponent(() => import('@/features/diary/pages/diary-page'), 'DiaryPage'),
+})
+
+const announcementsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/announcements',
+  validateSearch: announcementsSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/announcements/pages/announcements-page'),
+    'AnnouncementsPage'
+  ),
+})
+
+const chatRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/chat',
+  validateSearch: chatSearchSchema,
+  component: lazyRouteComponent(() => import('@/features/chat/pages/chat-page'), 'ChatPage'),
 })
 
 const notificationsRoute = createRoute({
@@ -365,6 +392,9 @@ const routeTree = rootRoute.addChildren([
     usersRoute,
     notificationsRoute,
     meetingsRoute,
+    diaryRoute,
+    announcementsRoute,
+    chatRoute,
     fleetRoute,
     tripRoute,
     tripPlaybackRoute,

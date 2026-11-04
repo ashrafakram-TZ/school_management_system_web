@@ -11,6 +11,7 @@ import { toApiError } from '@/lib/api/errors'
 import { filesApi } from '@/lib/files'
 import { setupApi, useSchoolProfile, useSetupMutation, type SchoolProfile } from '../api'
 import { fieldErrorsOf } from '../form-actions'
+import { CommunicationSettings } from './communication-settings'
 import { RootError, Section } from './setup-shared'
 
 const BOARDS = [
@@ -25,7 +26,16 @@ export function ProfileTab({ canManage }: { canManage: boolean }) {
   if (profile.isError)
     return <ErrorState message={profile.error.message} onRetry={() => profile.refetch()} />
   if (!profile.data) return <Skeleton className='h-96' />
-  return <ProfileForm key={profile.data.id} school={profile.data} canManage={canManage} />
+  return (
+    <div className='grid gap-4'>
+      <ProfileForm key={profile.data.id} school={profile.data} canManage={canManage} />
+      <CommunicationSettings
+        key={`comm-${profile.data.id}`}
+        school={profile.data}
+        canManage={canManage}
+      />
+    </div>
+  )
 }
 
 function ProfileForm({ school, canManage }: { school: SchoolProfile; canManage: boolean }) {

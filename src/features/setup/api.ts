@@ -81,6 +81,8 @@ export interface SetupSummary {
   next_holiday: Holiday | null
 }
 
+export type DiaryReviewMode = 'all' | 'remarks'
+
 export interface SchoolProfile {
   id: number
   name: string
@@ -96,6 +98,10 @@ export interface SchoolProfile {
   latitude: number | null
   longitude: number | null
   geofence_radius_m: number
+  staff_reporting_time: string
+  diary_review_mode: DiaryReviewMode
+  chat_office_start: string
+  chat_office_end: string
   logo_file_id: number | null
   logo_url: string | null
   timezone: string

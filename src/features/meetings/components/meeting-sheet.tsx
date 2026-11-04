@@ -14,7 +14,14 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateTime, formatTime } from '@/lib/format'
 import { useMeeting, type MeetingPerson } from '../api'
-import { durationLabel, MEETING_STATUS, PARTY_LABEL } from '../labels'
+import {
+  durationLabel,
+  END_REASON,
+  isLive,
+  LEAVE_REASON,
+  MEETING_STATUS,
+  PARTY_LABEL,
+} from '../labels'
 
 export function MeetingSheet({
   meetingId,
@@ -51,11 +58,7 @@ export function MeetingSheet({
                     {formatDateTime(data.scheduled_at)} · {durationLabel(data.duration_minutes)}
                   </SheetDescription>
                   <div className='mt-1 flex flex-wrap gap-1.5'>
-                    <Badge
-                      tone={MEETING_STATUS[data.status].tone}
-                      dot
-                      pulse={data.status === 'live'}
-                    >
+                    <Badge tone={MEETING_STATUS[data.status].tone} dot pulse={isLive(data.status)}>
                       {MEETING_STATUS[data.status].label}
                     </Badge>
                     <Badge tone='neutral'>
@@ -98,14 +101,26 @@ export function MeetingSheet({
                 <dl className='grid gap-x-6 gap-y-3 rounded-lg border p-3 sm:grid-cols-2'>
                   {[
                     ['Starts', formatDateTime(data.scheduled_at)],
-                    ['Ends', formatDateTime(data.ends_at)],
+                    [
+                      'Scheduled end',
+                      `${formatDateTime(data.ends_at)}${data.extended_minutes ? ` (extended ${data.extended_minutes} min)` : ''}`,
+                    ],
                     [
                       'Join opens',
-                      `${formatTime(data.join_opens_at)} to ${formatTime(data.join_closes_at)}`,
+                      data.join_closes_at
+                        ? `${formatTime(data.join_opens_at)} to ${formatTime(data.join_closes_at)}`
+                        : `${formatTime(data.join_opens_at)}, until the host ends it`,
                     ],
-                    ['Call length', durationLabel(data.call_minutes)],
+                    ['Actual length', durationLabel(data.call_minutes)],
                     ['Started', formatDateTime(data.started_at)],
-                    ['Ended', formatDateTime(data.ended_at)],
+                    [
+                      'Ended',
+                      data.ended_at
+                        ? `${formatDateTime(data.ended_at)}${data.end_reason ? ` · ${END_REASON[data.end_reason]}` : ''}`
+                        : '—',
+                    ],
+                    ['Extended by', data.extended_by?.name ?? '—'],
+                    ['Academic year', data.academic_year.name],
                   ].map(([label, value]) => (
                     <div key={label} className='grid gap-0.5'>
                       <dt className='text-[11px] font-bold tracking-wider text-muted-foreground uppercase'>
@@ -144,6 +159,10 @@ export function MeetingSheet({
                           <span className='truncate font-semibold'>{entry.user.name}</span>
                           <span className='text-xs text-muted-foreground'>
                             {PARTY_LABEL[entry.party]} · {entry.platform}
+                            {entry.source === 'agora' ? ' · seen by Agora' : ''}
+                            {entry.leave_reason
+                              ? ` · ${LEAVE_REASON[entry.leave_reason] ?? entry.leave_reason}`
+                              : ''}
                           </span>
                         </span>
                         <span className='tabular text-right text-xs text-muted-foreground'>

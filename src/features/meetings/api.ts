@@ -1,7 +1,8 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { api, type Paginated } from '@/lib/api/client'
 
-export type MeetingStatus = 'scheduled' | 'live' | 'completed' | 'missed' | 'cancelled'
+export type MeetingStatus =
+  'scheduled' | 'in_progress' | 'time_exceeded' | 'completed' | 'missed' | 'cancelled'
 export type MeetingParty = 'teacher' | 'parent'
 export type MeetingWhen = 'today' | 'upcoming' | 'past'
 
@@ -20,6 +21,11 @@ export interface Meeting {
   scheduled_at: string
   ends_at: string
   duration_minutes: number
+  extended_minutes: number
+  extended_at: string | null
+  extended_by: { id: number; name: string } | null
+  academic_year: { id: number; name: string }
+  host_id: number
   scheduled_by: MeetingParty
   from: MeetingPerson
   to: MeetingPerson
@@ -28,10 +34,12 @@ export interface Meeting {
   student: { id: number; name: string; class_section: string | null }
   can_join: boolean
   join_opens_at: string
-  join_closes_at: string
+  join_closes_at: string | null
   started_at: string | null
   ended_at: string | null
   call_minutes: number | null
+  ended_by: { id: number; name: string } | null
+  end_reason: 'host_ended' | 'empty' | null
   cancelled_by: { id: number; name: string } | null
   cancel_reason: string | null
   created_at: string
@@ -41,6 +49,8 @@ export interface MeetingCallLog {
   user: { id: number; name: string }
   party: MeetingParty
   platform: string
+  source: 'app' | 'agora'
+  leave_reason: string | null
   joined_at: string
   left_at: string | null
   minutes: number | null
@@ -55,6 +65,7 @@ export interface MeetingInsights {
   today: number
   upcoming: number
   live: number
+  time_exceeded: number
   completed: number
   missed: number
   cancelled: number
