@@ -29,11 +29,12 @@ export const SHORTCUTS = {
   'nav.diary': { combo: 'g z', label: 'Go to diary', group: 'Navigation' },
   'nav.announcements': { combo: 'g q', label: 'Go to announcements', group: 'Navigation' },
   'nav.chat': { combo: 'g g', label: 'Go to chat audit', group: 'Navigation' },
+  'nav.appBanners': { combo: 'g 2', label: 'Go to app banners', group: 'Navigation' },
   'nav.fleet': { combo: 'g b', label: 'Go to bus tracking', group: 'Navigation' },
   'nav.alerts': { combo: 'g l', label: 'Go to fleet alerts', group: 'Navigation' },
   'nav.tripHistory': { combo: 'g h', label: 'Go to trip history', group: 'Navigation' },
   'nav.maintenance': { combo: 'g i', label: 'Go to maintenance', group: 'Navigation' },
-  'nav.parentPreview': { combo: 'g q', label: 'Go to parent app preview', group: 'Navigation' },
+  'nav.parentPreview': { combo: 'g 1', label: 'Go to parent app preview', group: 'Navigation' },
   'app.help': { combo: 'shift+?', label: 'Show keyboard shortcuts', group: 'General' },
   'app.search': { combo: '/', label: 'Focus search', group: 'General' },
   'app.refresh': { combo: 'alt+r', label: 'Refresh data', group: 'General' },
@@ -45,6 +46,11 @@ export const SHORTCUTS = {
   'maintenance.create': {
     combo: 'alt+n',
     label: 'Add a maintenance ticket or fuel entry',
+    group: 'Users',
+  },
+  'banners.create': {
+    combo: 'alt+n',
+    label: 'Add a banner',
     group: 'Users',
   },
 } as const satisfies Record<string, ShortcutDefinition>

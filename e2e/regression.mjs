@@ -1436,6 +1436,8 @@ await D5(
     await see(/removed from period/)
   }
 )
+await aoSubContext.storageState({ path: path.join(ROOT, '.auth-ao.json') }).catch(() => null)
+
 await aoSubContext.close()
 page = adminPage
 await D5(
@@ -1964,6 +1966,8 @@ await TA(
       await see('Combined class removed')
     }
   )
+  await aoContext.storageState({ path: path.join(ROOT, '.auth-ao.json') }).catch(() => null)
+
   await aoContext.close()
   page = previous
 }
@@ -2176,6 +2180,23 @@ await D9W(
     await page.getByRole('heading', { name: /Meetings/ }).first().waitFor({ timeout: 8000 })
   }
 )
+await TA(
+  {
+    id: 'AB-01',
+    module: 'App banners',
+    type: 'Validation',
+    title: 'A banner needs a title (image optional)',
+    steps: 'App banners, Add banner, Save empty.',
+    expected: 'Title message only; no image error',
+  },
+  async () => {
+    await go('/app-banners')
+    await page.getByRole('button', { name: /^Add banner/ }).first().click()
+    await dialog().getByRole('button', { name: 'Save' }).click()
+    await see('Enter a title of 3 to 80 letters', dialog())
+    if (await dialog().getByText('Upload a banner image').count()) throw new Error('Image should be optional')
+  }
+)
 {
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -2200,6 +2221,7 @@ await D9W(
     ['RS-14', '/fleet/maintenance', 'Tickets'],
     ['RS-15', '/parent-preview', /Parent app/],
     ['RS-16', '/meetings', /Meetings/],
+    ['RS-17', '/app-banners', 'Live now'],
   ]) {
     await test(
       {
@@ -2238,6 +2260,13 @@ for (const item of leftovers.data?.items ?? []) {
   if (item.status !== 'enrolled') cleanup.push(api('DELETE', `/admin/admissions/${item.id}`))
 }
 await Promise.allSettled(cleanup)
+
+for (const [context, file] of [
+  [admin.context, '.auth-admin.json'],
+  [superAdmin.context, '.auth-super.json'],
+]) {
+  await context.storageState({ path: path.join(ROOT, file) }).catch(() => null)
+}
 
 await browser.close()
 const passed = results.filter((row) => row.status === 'Pass').length

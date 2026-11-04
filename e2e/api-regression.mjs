@@ -2336,6 +2336,119 @@ await D9('API-D9-07', 'Meetings', 'GET', '/admin/meetings', 'Meetings list and i
   return expectStatus(await admin('GET', '/admin/meetings?limit=5'), 200)
 })
 
+await TA('API-BE-01', 'Teacher app', 'GET', '/mobile/teacher/sections/:id/students', 'Roster by rank, descending', '200, ranks in descending order, unranked last', async () => {
+  if (!teacherSection) return 'Skipped: teacher has no section'
+  const result = await teacher('GET', `/mobile/teacher/sections/${teacherSection}/students?sort=rank&order=desc`)
+  expectStatus(result, 200)
+  const ranks = result.body.data.map((item) => item.rank)
+  const ranked = ranks.filter((rank) => rank !== null)
+  if (ranks.slice(0, ranked.length).some((rank) => rank === null)) throw new Error('Unranked before ranked')
+  for (let index = 1; index < ranked.length; index += 1) if (ranked[index] > ranked[index - 1]) throw new Error('Not descending')
+  return `200, ${ranks.join(',')}`
+})
+await TA('API-BE-02', 'Teacher app', 'GET', '/mobile/teacher/sections/:id/benches', 'Bench groups in roll order', '200, First/…/Last covering every student once', async () => {
+  if (!teacherSection) return 'Skipped: teacher has no section'
+  const result = await teacher('GET', `/mobile/teacher/sections/${teacherSection}/benches?sort=roll_no&order=asc&groups=3`)
+  expectStatus(result, 200)
+  const { groups, total } = result.body.data
+  if (groups.reduce((sum, group) => sum + group.count, 0) !== total) throw new Error('Counts do not add up')
+  if (groups.at(-1).label !== 'Last') throw new Error('Last group label')
+  return `200, ${groups.map((group) => `${group.label} ${group.count}`).join(', ')}`
+})
+await TA('API-BE-03', 'Teacher app', 'GET', '/mobile/teacher/sections/:id/students', 'Unknown sort value', '400 on sort', async () => {
+  if (!teacherSection) return 'Skipped: teacher has no section'
+  return expectFields(await teacher('GET', `/mobile/teacher/sections/${teacherSection}/students?sort=height`), ['sort'])
+})
+
+await TA('API-PS-01', 'Payslips', 'GET', '/mobile/teacher/payslips/periods', 'Teacher payslip years and months', '200 with years newest first', async () => {
+  const result = await teacher('GET', '/mobile/teacher/payslips/periods')
+  expectStatus(result, 200)
+  const years = result.body.data.years
+  for (let index = 1; index < years.length; index += 1) if (years[index].year > years[index - 1].year) throw new Error('Not newest first')
+  return `200, ${years.map((year) => `${year.year}: ${year.months.length} months`).join(', ') || 'no payslips'}`
+})
+await TA('API-PS-02', 'Payslips', 'GET', '/mobile/teacher/payslips/:id', 'Payslip preview and PDF', '200 with earnings and deductions; PDF downloads', async () => {
+  const list = await teacher('GET', '/mobile/teacher/payslips?limit=1')
+  expectStatus(list, 200)
+  const slip = list.body.data.items[0]
+  if (!slip) return 'Skipped: no final payslip yet'
+  const preview = await teacher('GET', `/mobile/teacher/payslips/${slip.id}`)
+  expectStatus(preview, 200)
+  const data = preview.body.data
+  const earned = data.earnings.reduce((sum, line) => sum + line.amount, 0)
+  if (Math.abs(earned - data.gross) > 1) throw new Error(`Earnings ${earned} vs gross ${data.gross}`)
+  const pdf = await teacher('GET', `/mobile/teacher/payslips/${slip.id}/pdf`)
+  if (pdf.status !== 200 || !pdf.type.includes('pdf')) throw new Error(`PDF ${pdf.status} ${pdf.type}`)
+  return `200, ${data.month_label} net ${data.net}, PDF ok`
+})
+await TA('API-PS-03', 'Payslips', 'GET', '/mobile/teacher/payslips', 'Month filter out of range', '400 on month', async () =>
+  expectFields(await teacher('GET', '/mobile/teacher/payslips?month=13'), ['month'])
+)
+await TA('API-PS-04', 'Payslips', 'GET', '/mobile/teacher/payslips/:id', 'Someone else’s payslip', '404 PAYSLIP_NOT_FOUND', async () =>
+  expectStatus(await teacher('GET', '/mobile/teacher/payslips/999999'), 404, 'PAYSLIP_NOT_FOUND')
+)
+
+await TA('API-SX-01', 'Teacher app', 'GET', '/mobile/teacher/profile', 'Staff profile for the Me screen', '200 with headline and subjects', async () => {
+  const result = await teacher('GET', '/mobile/teacher/profile')
+  expectStatus(result, 200)
+  if (!result.body.data.headline) throw new Error('No headline')
+  return `200, ${result.body.data.headline}`
+})
+await TA('API-SX-02', 'Teacher app', 'GET', '/mobile/teacher/leaves/preview', 'Leave preview over a weekend', '200; Sunday not counted', async () => {
+  const balances = (await teacher('GET', '/mobile/teacher/leave-balances')).body.data
+  const type = balances[0].leave_type.id
+  const result = await teacher('GET', `/mobile/teacher/leaves/preview?leave_type_id=${type}&from_date=2026-11-14&to_date=2026-11-16`)
+  expectStatus(result, 200)
+  if (result.body.data.dates.includes('2026-11-15')) throw new Error('Sunday counted')
+  return `200, ${result.body.data.days} days, ${result.body.data.period_count} periods`
+})
+await TA('API-SX-03', 'Teacher app', 'GET', '/mobile/teacher/leaves/preview', 'Leave preview with the last day before the first', '400 on to_date', async () => {
+  const balances = (await teacher('GET', '/mobile/teacher/leave-balances')).body.data
+  return expectFields(
+    await teacher('GET', `/mobile/teacher/leaves/preview?leave_type_id=${balances[0].leave_type.id}&from_date=2026-11-16&to_date=2026-11-14`),
+    ['to_date']
+  )
+})
+await TA('API-SX-04', 'Teacher app', 'GET', '/mobile/teacher/classes', 'My classes with weekly periods and class-teacher summary', '200; summary only for class-teacher sections', async () => {
+  const result = await teacher('GET', '/mobile/teacher/classes')
+  expectStatus(result, 200)
+  for (const item of result.body.data) {
+    if (typeof item.periods_per_week !== 'number') throw new Error('periods_per_week missing')
+    if (Boolean(item.class_teacher_summary) !== item.is_class_teacher) throw new Error(`Summary mismatch for ${item.class_name}-${item.section_name}`)
+  }
+  return `200, ${result.body.data.length} classes`
+})
+await TA('API-SX-05', 'Teacher app', 'GET', '/mobile/teacher/sections/:id/students', 'Roster shows today’s attendance status', '200 with today_status on each row', async () => {
+  if (!teacherSection) return 'Skipped: teacher has no section'
+  const result = await teacher('GET', `/mobile/teacher/sections/${teacherSection}/students`)
+  expectStatus(result, 200)
+  if (result.body.data.some((item) => !item.today_status)) throw new Error('today_status missing')
+  return `200, ${[...new Set(result.body.data.map((item) => item.today_status))].join(', ')}`
+})
+await TA('API-SX-06', 'Teacher app', 'GET', '/mobile/teacher/check-in', 'Check-in status has the school gate location', '200 with school_latitude and school_longitude', async () => {
+  const result = await teacher('GET', '/mobile/teacher/check-in')
+  expectStatus(result, 200)
+  if (!('school_latitude' in result.body.data)) throw new Error('school_latitude missing')
+  return `200, ${result.body.data.school_latitude}, ${result.body.data.school_longitude}`
+})
+
+await TA('API-AB-01', 'App banners', 'POST', '/admin/app-banners', 'Banner with nothing filled', '400 on title, starts_on, ends_on (image is optional)', async () =>
+  expectFields(await admin('POST', '/admin/app-banners', {}), ['title', 'starts_on', 'ends_on'])
+)
+await TA('API-AB-02', 'App banners', 'GET', '/admin/app-banners', 'Banner list and insights', '200', async () => {
+  expectStatus(await admin('GET', '/admin/app-banners/insights'), 200)
+  return expectStatus(await admin('GET', '/admin/app-banners?state=live'), 200)
+})
+await TA('API-AB-03', 'App banners', 'GET', '/mobile/parent/banner', 'Parent app banners', '200 with a list of SCHOOL_BANNER items', async () => {
+  const result = await parent('GET', '/mobile/parent/banner')
+  expectStatus(result, 200)
+  if (result.body.data.banners.some((item) => item.code !== 'SCHOOL_BANNER')) throw new Error('Unexpected code')
+  return `200, ${result.body.data.banners.length} banners`
+})
+await TA('API-AB-04', 'App banners', 'POST', '/admin/app-banners', 'Teacher tries to add a banner', '403', async () =>
+  expectStatus(await teacher('POST', '/admin/app-banners', {}), 403)
+)
+
 await admin('DELETE', `/admin/students/${studentId}`)
 if (userId) await admin('DELETE', `/admin/users/${userId}`)
 

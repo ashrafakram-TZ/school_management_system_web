@@ -1,5 +1,6 @@
 import {
   BellRing,
+  GalleryHorizontal,
   Building2,
   CalendarCheck,
   CalendarRange,
@@ -51,6 +52,7 @@ export type NavPath =
   | '/diary'
   | '/announcements'
   | '/chat'
+  | '/app-banners'
   | '/fleet'
   | '/fleet/alerts'
   | '/fleet/history'
@@ -247,6 +249,14 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: MessagesSquare,
         shortcut: 'nav.chat',
         permission: 'chat.audit',
+      },
+      {
+        to: '/app-banners',
+        label: 'App banners',
+        description: 'Image banners for the Staff and Parent app home screens',
+        icon: GalleryHorizontal,
+        shortcut: 'nav.appBanners',
+        permission: 'notifications.view',
       },
     ],
   },

@@ -18,6 +18,7 @@ import { diarySearchSchema } from '@/features/diary/search'
 import { announcementsSearchSchema } from '@/features/announcements/search'
 import { chatSearchSchema } from '@/features/chat/search'
 import { outboxSearchSchema } from '@/features/notifications/search'
+import { appBannersSearchSchema } from '@/features/app-banners/search'
 import { setupSearchSchema } from '@/features/setup/search'
 import {
   assignmentsSearchSchema,
@@ -118,6 +119,16 @@ const chatRoute = createRoute({
   path: '/chat',
   validateSearch: chatSearchSchema,
   component: lazyRouteComponent(() => import('@/features/chat/pages/chat-page'), 'ChatPage'),
+})
+
+const appBannersRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/app-banners',
+  validateSearch: appBannersSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/app-banners/pages/app-banners-page'),
+    'AppBannersPage'
+  ),
 })
 
 const notificationsRoute = createRoute({
@@ -391,6 +402,7 @@ const routeTree = rootRoute.addChildren([
     parentPreviewRoute,
     usersRoute,
     notificationsRoute,
+    appBannersRoute,
     meetingsRoute,
     diaryRoute,
     announcementsRoute,
