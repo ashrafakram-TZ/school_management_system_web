@@ -11,7 +11,7 @@ import { formatDateTime, formatTime } from '@/lib/format'
 import { useMeetingInsights, useMeetings, type Meeting, type MeetingStatus } from '../api'
 import { MeetingPeople } from '../components/meeting-people'
 import { MeetingSheet } from '../components/meeting-sheet'
-import { durationLabel, MEETING_STATUS } from '../labels'
+import { durationLabel, isLive, MEETING_STATUS } from '../labels'
 import type { MeetingsSearch } from '../search'
 
 const route = getRouteApi('/_app/meetings')
@@ -65,11 +65,11 @@ export function MeetingsPage() {
       key: 'live',
       label: 'Live now',
       value: data?.live ?? 0,
-      hint: `${data?.completed ?? 0} completed`,
+      hint: `${data?.time_exceeded ?? 0} over time · ${data?.completed ?? 0} completed`,
       icon: Radio,
       tone: 'success',
-      active: search.status === 'live',
-      onClick: () => toggleStatus('live'),
+      active: search.status === 'in_progress',
+      onClick: () => toggleStatus('in_progress'),
     },
     {
       key: 'missed',
@@ -243,7 +243,7 @@ export function MeetingsPage() {
 function StatusBadge({ meeting }: { meeting: Meeting }) {
   const status = MEETING_STATUS[meeting.status]
   return (
-    <Badge tone={status.tone} dot pulse={meeting.status === 'live'}>
+    <Badge tone={status.tone} dot pulse={isLive(meeting.status)}>
       {status.label}
     </Badge>
   )
