@@ -1,9 +1,16 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { BatteryFull, Bell, GraduationCap, SignalHigh, Wifi } from 'lucide-react'
+import {
+  ArrowLeft,
+  BatteryFull,
+  Bell,
+  GraduationCap,
+  SignalHigh,
+  Wifi,
+  type LucideIcon,
+} from 'lucide-react'
 import { useNow } from '@/hooks/use-now'
 import { config } from '@/config/env'
 import { cn } from '@/lib/utils'
-import { PHONE_TABS, type PhoneTab } from '../tabs'
 
 const clock = new Intl.DateTimeFormat('en-GB', {
   timeZone: config.timeZone,
@@ -15,28 +22,44 @@ const clock = new Intl.DateTimeFormat('en-GB', {
 const PHONE_FONT =
   "'Manrope Variable', 'Noto Sans Tamil', 'Nirmala UI', 'Latha', 'Tamil Sangam MN', ui-sans-serif, system-ui, sans-serif"
 
-interface PhoneFrameProps {
-  tab: PhoneTab
-  onTab: (tab: PhoneTab) => void
-  schoolName: string
+export interface PhoneScreen<T extends string> {
+  id: T
+  label: string
+  title: string
+  icon: LucideIcon
+}
+
+interface PhoneFrameProps<T extends string> {
+  app: string
+  nav: PhoneScreen<T>[]
+  tab: T
+  onTab: (tab: T) => void
+  title: string
+  subtitle: string
   logoUrl: string | null
-  childName: string | null
+  schoolName: string
   unread: number
+  onBell: () => void
+  onBack?: () => void
   children: ReactNode
 }
 
-export function PhoneFrame({
+export function PhoneFrame<T extends string>({
+  app,
+  nav,
   tab,
   onTab,
-  schoolName,
+  title,
+  subtitle,
   logoUrl,
-  childName,
+  schoolName,
   unread,
+  onBell,
+  onBack,
   children,
-}: PhoneFrameProps) {
+}: PhoneFrameProps<T>) {
   const now = useNow(30_000)
   const scroller = useRef<HTMLDivElement>(null)
-  const current = PHONE_TABS.find((item) => item.id === tab) ?? PHONE_TABS[0]
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: 0 })
@@ -65,7 +88,16 @@ export function PhoneFrame({
         </div>
 
         <header className='flex shrink-0 items-center gap-3 border-b bg-card px-4 py-3'>
-          {logoUrl ? (
+          {onBack ? (
+            <button
+              type='button'
+              aria-label='Back'
+              onClick={onBack}
+              className='grid size-10 shrink-0 place-items-center rounded-full hover:bg-muted'
+            >
+              <ArrowLeft className='size-5' />
+            </button>
+          ) : logoUrl ? (
             <img
               src={logoUrl}
               alt={`${schoolName} logo`}
@@ -77,17 +109,13 @@ export function PhoneFrame({
             </span>
           )}
           <div className='grid min-w-0 flex-1'>
-            <span className='truncate text-base leading-tight font-extrabold'>
-              {tab === 'home' ? schoolName : current.title}
-            </span>
-            <span className='truncate text-xs text-muted-foreground'>
-              {childName ?? 'Parent app'}
-            </span>
+            <span className='truncate text-base leading-tight font-extrabold'>{title}</span>
+            <span className='truncate text-xs text-muted-foreground'>{subtitle}</span>
           </div>
           <button
             type='button'
             aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
-            onClick={() => onTab('notifications')}
+            onClick={onBell}
             className='relative grid size-11 shrink-0 place-items-center rounded-full hover:bg-muted'
           >
             <Bell className='size-5' />
@@ -107,10 +135,11 @@ export function PhoneFrame({
         </div>
 
         <nav
-          aria-label='Parent app tabs'
-          className='grid shrink-0 grid-cols-7 border-t bg-card px-1 pt-1 pb-2 sm:pb-5'
+          aria-label={`${app} tabs`}
+          className='grid shrink-0 border-t bg-card px-1 pt-1 pb-2 sm:pb-5'
+          style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}
         >
-          {PHONE_TABS.map((item) => {
+          {nav.map((item) => {
             const active = item.id === tab
             return (
               <button

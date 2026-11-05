@@ -18,6 +18,7 @@ import {
   School,
   ShieldCheck,
   Smartphone,
+  TabletSmartphone,
   Siren,
   Trophy,
   Truck,
@@ -34,6 +35,7 @@ import type { ShortcutId } from './shortcuts'
 export type NavPath =
   | '/'
   | '/parent-preview'
+  | '/teacher-preview'
   | '/students'
   | '/admissions'
   | '/guardians'
@@ -86,13 +88,28 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: LayoutDashboard,
         shortcut: 'nav.dashboard',
       },
+    ],
+  },
+  {
+    label: 'App previews',
+    items: [
       {
         to: '/parent-preview',
-        label: 'Parent app preview',
-        description: 'What a parent sees in the mobile app for their child',
+        label: 'Parent app',
+        description:
+          'What a parent sees for their child: attendance, bus, results, fees, diary, meetings, chat and news',
         icon: Smartphone,
         shortcut: 'nav.parentPreview',
         permission: 'students.view',
+      },
+      {
+        to: '/teacher-preview',
+        label: 'Teacher app',
+        description:
+          'What a teacher sees: today’s periods, classes, diary posts, parent meetings, chat and news',
+        icon: TabletSmartphone,
+        shortcut: 'nav.teacherPreview',
+        permission: 'staff.view',
       },
     ],
   },

@@ -35,6 +35,11 @@ export const SHORTCUTS = {
   'nav.tripHistory': { combo: 'g h', label: 'Go to trip history', group: 'Navigation' },
   'nav.maintenance': { combo: 'g i', label: 'Go to maintenance', group: 'Navigation' },
   'nav.parentPreview': { combo: 'g 1', label: 'Go to parent app preview', group: 'Navigation' },
+  'nav.teacherPreview': {
+    combo: 'g 3',
+    label: 'Go to teacher app preview',
+    group: 'Navigation',
+  },
   'app.help': { combo: 'shift+?', label: 'Show keyboard shortcuts', group: 'General' },
   'app.search': { combo: '/', label: 'Focus search', group: 'General' },
   'app.refresh': { combo: 'alt+r', label: 'Refresh data', group: 'General' },

@@ -8,10 +8,11 @@ import { Card } from '@/components/ui/card'
 import { useMe } from '@/features/auth/api'
 import { useStudent, useStudents, type StudentListItem } from '@/features/students/api'
 import { useDebouncedValue } from '@/hooks/use-debounce'
-import { usePreviewHome, usePreviewNotifications } from '../api'
+import { parentBase, usePreviewHome, usePreviewNotifications } from '../api'
+import { ChatScreen, DiaryScreen, MeetingsScreen, NewsScreen } from '../components/connect-screens'
 import { AttendanceScreen, BusScreen, HomeScreen } from '../components/home-screens'
 import { PhoneFrame } from '../components/phone-frame'
-import type { PhoneTab } from '../tabs'
+import { isConnectScreen, PHONE_TABS, screenTitle, type PhoneTab } from '../tabs'
 import {
   AchievementsScreen,
   FeesScreen,
@@ -52,6 +53,14 @@ function Screen({
       return <AchievementsScreen studentId={studentId} />
     case 'notifications':
       return <NotificationsScreen studentId={studentId} />
+    case 'diary':
+      return <DiaryScreen base={parentBase(studentId)} party='parent' />
+    case 'meetings':
+      return <MeetingsScreen base={parentBase(studentId)} party='parent' />
+    case 'chat':
+      return <ChatScreen base={parentBase(studentId)} party='parent' />
+    case 'news':
+      return <NewsScreen base={parentBase(studentId)} />
     default:
       return <HomeScreen studentId={studentId} onOpen={onTab} />
   }
@@ -70,14 +79,20 @@ function ChildPhone({
   const home = usePreviewHome(studentId)
   const notifications = usePreviewNotifications(studentId)
   const unread = notifications.data?.items.filter((item) => !item.is_read).length ?? 0
+  const schoolName = home.data?.child?.school.name ?? me?.school?.name ?? 'School'
   return (
     <PhoneFrame
+      app='Parent app'
+      nav={PHONE_TABS}
       tab={tab}
       onTab={onTab}
-      schoolName={home.data?.child?.school.name ?? me?.school?.name ?? 'School'}
+      title={tab === 'home' ? schoolName : screenTitle(tab)}
+      subtitle={home.data?.child?.full_name ?? 'Parent app'}
+      schoolName={schoolName}
       logoUrl={me?.school?.logo_url ?? null}
-      childName={home.data?.child?.full_name ?? null}
       unread={unread}
+      onBell={() => onTab('notifications')}
+      onBack={isConnectScreen(tab) ? () => onTab('home') : undefined}
     >
       <Screen key={`${studentId}-${tab}`} tab={tab} studentId={studentId} onTab={onTab} />
     </PhoneFrame>
@@ -116,7 +131,7 @@ export function ParentPreviewPage() {
           <PageHeader
             eyebrow='Parent app'
             title='Parent app preview'
-            description='See what a parent sees in the mobile app for their child: home, attendance, bus, results, fees and achievements.'
+            description='See what a parent sees in the mobile app for their child: home, attendance, bus, results, fees, awards, diary, meetings, chat and announcements.'
           />
           <Card className='grid gap-4 p-5'>
             <div className='grid gap-1.5'>

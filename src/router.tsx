@@ -43,6 +43,7 @@ import { timetableSearchSchema } from '@/features/timetable/search'
 import { transportSearchSchema } from '@/features/transport/search'
 import { usersSearchSchema } from '@/features/users/search'
 import { parentPreviewSearchSchema } from '@/features/parent-preview/search'
+import { teacherPreviewSearchSchema } from '@/features/teacher-preview/search'
 
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: Outlet,
@@ -368,6 +369,16 @@ const parentPreviewRoute = createRoute({
   ),
 })
 
+const teacherPreviewRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/teacher-preview',
+  validateSearch: teacherPreviewSearchSchema,
+  component: lazyRouteComponent(
+    () => import('@/features/teacher-preview/pages/teacher-preview-page'),
+    'TeacherPreviewPage'
+  ),
+})
+
 const schoolsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/schools',
@@ -400,6 +411,7 @@ const routeTree = rootRoute.addChildren([
     setupRoute,
     schoolsRoute,
     parentPreviewRoute,
+    teacherPreviewRoute,
     usersRoute,
     notificationsRoute,
     appBannersRoute,
