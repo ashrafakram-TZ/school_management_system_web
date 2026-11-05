@@ -2449,6 +2449,73 @@ await TA('API-AB-04', 'App banners', 'POST', '/admin/app-banners', 'Teacher trie
   expectStatus(await teacher('POST', '/admin/app-banners', {}), 403)
 )
 
+const published = (await admin('GET', '/admin/exams?status=published&limit=1')).body?.data?.items?.[0]
+const publishedDetail = published ? (await admin('GET', `/admin/exams/${published.id}`)).body.data : null
+const rcSection = publishedDetail?.class_details?.[0]?.sections?.[0]?.id
+const rcStudent = rcSection
+  ? (await admin('GET', `/admin/exams/${published.id}/sections/${rcSection}/results`)).body?.data?.rows?.[0]?.student_id
+  : undefined
+const pdfOk = (result) => {
+  if (result.status !== 200 || !result.type.includes('application/pdf'))
+    throw new Error(`Got ${result.status} ${result.type}`)
+  return '200 application/pdf'
+}
+await TA('API-RCD-01', 'Report card', 'GET', '/admin/students/{id}/report-card', 'Whole-year report card', '200 with columns, subjects, overall, attendance and options', async () => {
+  if (!rcStudent) return 'Skipped: no published results'
+  const result = await admin('GET', `/admin/students/${rcStudent}/report-card`)
+  expectStatus(result, 200)
+  const card = result.body.data
+  if (card.scope.kind !== 'year' || !card.columns.length || !card.subjects.length) throw new Error('Empty card')
+  if (card.subjects.some((row) => row.cells.length !== card.columns.length)) throw new Error('Cells do not match columns')
+  if (!card.options.exams.length || !card.pdf_path) throw new Error('options or pdf_path missing')
+  return `200, ${card.columns.length} exams, ${card.subjects.length} subjects, ${card.overall.percent}% ${card.overall.grade}`
+})
+await TA('API-RCD-02', 'Report card', 'GET', '/admin/students/{id}/report-card?exam_id=', 'Report card for one exam', '200 with one column', async () => {
+  if (!rcStudent) return 'Skipped: no published results'
+  const result = await admin('GET', `/admin/students/${rcStudent}/report-card?exam_id=${published.id}`)
+  expectStatus(result, 200)
+  if (result.body.data.scope.kind !== 'exam' || result.body.data.columns.length !== 1) throw new Error('Wrong scope')
+  return '200, 1 exam'
+})
+await TA('API-RCD-03', 'Report card', 'GET', '/admin/students/{id}/report-card/pdf', 'Printable report card', '200 application/pdf', async () => {
+  if (!rcStudent) return 'Skipped: no published results'
+  const response = await fetch(`${API}/admin/students/${rcStudent}/report-card/pdf`, { headers: { authorization: `Bearer ${adminToken}` } })
+  return pdfOk({ status: response.status, type: response.headers.get('content-type') ?? '' })
+})
+await TA('API-RCD-04', 'Report card', 'GET', '/admin/report-cards/sections/{id}/pdf', 'Report cards of a whole section', '200 application/pdf', async () => {
+  if (!rcSection) return 'Skipped: no published results'
+  const response = await fetch(`${API}/admin/report-cards/sections/${rcSection}/pdf?exam_id=${published.id}`, { headers: { authorization: `Bearer ${adminToken}` } })
+  return pdfOk({ status: response.status, type: response.headers.get('content-type') ?? '' })
+})
+await TA('API-RCD-05', 'Report card', 'GET', '/admin/students/{id}/report-card?exam_id=999999', 'Unknown exam', '404 EXAM_NOT_FOUND', async () => {
+  if (!rcStudent) return 'Skipped: no published results'
+  return expectStatus(await admin('GET', `/admin/students/${rcStudent}/report-card?exam_id=999999`), 404, 'EXAM_NOT_FOUND')
+})
+await TA('API-RCD-06', 'Report card', 'GET', '/admin/students/{id}/report-card?term_id=abc', 'Bad term id', '400 on term_id', async () =>
+  expectFields(await admin('GET', `/admin/students/${rcStudent ?? 1}/report-card?term_id=abc`), ['term_id'])
+)
+await TA('API-RCD-07', 'Report card', 'GET', '/mobile/parent/children/{id}/report-card', 'Parent opens a child that is not theirs', '404 CHILD_NOT_FOUND', async () =>
+  expectStatus(await parent('GET', '/mobile/parent/children/999999/report-card'), 404, 'CHILD_NOT_FOUND')
+)
+await TA('API-RCD-08', 'Report card', 'GET', '/admin/students/{id}/report-card', 'Teacher without exams.view', '403', async () =>
+  expectStatus(await teacher('GET', `/admin/students/${rcStudent ?? 1}/report-card`), 403)
+)
+
+const anonymous = client(null)
+await TA('API-OTP-01', 'Sign-in', 'POST', '/auth/otp/resend', 'Resend OTP with the Android app hash', '200 with resend_in', async () => {
+  const result = await anonymous('POST', '/auth/otp/resend', { mobile: '9000000005', app: 'mobile', app_hash: 'Xy12AbCd3Ef' })
+  if (result.status === 429) return '429 resend too soon (cool-down running)'
+  expectStatus(result, 200)
+  if (!result.body.data.resend_in) throw new Error('resend_in missing')
+  return `200, resend in ${result.body.data.resend_in}s`
+})
+await TA('API-OTP-02', 'Sign-in', 'POST', '/auth/otp/resend', 'App hash in the wrong format', '400 on app_hash', async () =>
+  expectFields(await anonymous('POST', '/auth/otp/resend', { mobile: '9000000005', app_hash: 'bad hash!' }), ['app_hash'])
+)
+await TA('API-OTP-03', 'Sign-in', 'POST', '/auth/otp/resend', 'Resend for a number that is not a user', '404 MOBILE_NOT_REGISTERED', async () =>
+  expectStatus(await anonymous('POST', '/auth/otp/resend', { mobile: '9999999998' }), 404, 'MOBILE_NOT_REGISTERED')
+)
+
 await admin('DELETE', `/admin/students/${studentId}`)
 if (userId) await admin('DELETE', `/admin/users/${userId}`)
 

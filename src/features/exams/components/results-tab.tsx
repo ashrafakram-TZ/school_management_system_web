@@ -1,5 +1,15 @@
 import { useState } from 'react'
-import { ChartColumnBig, CircleCheck, CircleX, Hourglass, Medal, Send, Trophy } from 'lucide-react'
+import {
+  ChartColumnBig,
+  ChevronDown,
+  CircleCheck,
+  CircleX,
+  FileSpreadsheet,
+  Hourglass,
+  Medal,
+  Send,
+  Trophy,
+} from 'lucide-react'
 import { DataTable, type Column } from '@/components/common/data-table'
 import { EmptyState, ErrorState } from '@/components/common/display'
 import { InsightCards, type Insight } from '@/components/common/insight-cards'
@@ -7,6 +17,14 @@ import { useShortcut } from '@/components/shortcuts/shortcut-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { alerts } from '@/lib/alerts'
+import { toApiError } from '@/lib/api/errors'
 import { cn } from '@/lib/utils'
 import {
   useClassToppers,
@@ -28,6 +46,7 @@ import {
   rankText,
   RESULT_STATUS,
 } from '../labels'
+import { reportCardsApi } from '../report-card-api'
 import type { ExamsSearch, ResultFilter } from '../search'
 import { ExamPicker, SectionPicker } from './exam-pickers'
 import { Podium } from './podium'
@@ -56,6 +75,18 @@ export function ResultsTab({
   const results = useSectionResults(chosenExam, chosenSection)
   const toppers = useClassToppers(chosenExam, schoolClass?.id)
   const [publishing, setPublishing] = useState(false)
+  const [printing, setPrinting] = useState(false)
+  const printCards = async (scope: { exam_id?: number; term_id?: number }) => {
+    if (!chosenSection) return
+    setPrinting(true)
+    try {
+      await reportCardsApi.openSectionPdf(chosenSection, scope)
+    } catch (error) {
+      alerts.error(toApiError(error).message)
+    } finally {
+      setPrinting(false)
+    }
+  }
   const data = results.data
   const summary = data?.summary
   const toggle = (value: ResultFilter) => onChange({ result: result === value ? undefined : value })
@@ -147,6 +178,30 @@ export function ResultsTab({
         />
         {detail && (
           <Badge tone={EXAM_STATUS[detail.status].tone}>{EXAM_STATUS[detail.status].label}</Badge>
+        )}
+        {detail?.status === 'published' && chosenSection && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size='sm' variant='outline' className='ml-auto' loading={printing}>
+                <FileSpreadsheet />
+                Report cards
+                <ChevronDown />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end'>
+              <DropdownMenuItem onSelect={() => printCards({ exam_id: detail.id })}>
+                {detail.name} only
+              </DropdownMenuItem>
+              {detail.term && (
+                <DropdownMenuItem onSelect={() => printCards({ term_id: detail.term!.id })}>
+                  Whole {detail.term.name}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onSelect={() => printCards({})}>
+                Whole year, every term
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         {canManage && detail?.status === 'draft' && (
           <Button size='sm' className='ml-auto' onClick={() => setPublishing(true)}>

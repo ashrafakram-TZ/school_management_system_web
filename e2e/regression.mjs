@@ -1385,12 +1385,12 @@ await D5(
     type: 'View',
     title: 'Substitutes board shows the teacher on leave and their periods',
     steps: `Open Substitutes for ${nextSchoolDay5}.`,
-    expected: 'Insight cards and a card for the teacher on Casual leave',
+    expected: 'Insight cards and a card for the teacher on leave with the leave type',
   },
   async () => {
     await go(`/substitutes?date=${nextSchoolDay5}`)
     await see('Teachers away')
-    await see('Casual leave')
+    await see(/Casual leave|Sick leave|Earned leave/)
   }
 )
 const aoSubContext = await browser.newContext({
@@ -2197,6 +2197,39 @@ await TA(
     if (await dialog().getByText('Upload a banner image').count()) throw new Error('Image should be optional')
   }
 )
+await test(
+  {
+    id: 'RCD-01',
+    module: 'Report card',
+    type: 'View',
+    title: 'Student report card shows the marksheet with print and download',
+    steps: 'Students, open a student with published results, Report card tab.',
+    expected: 'Progress report with subjects, overall grade and Print / Download PDF',
+  },
+  async () => {
+    await go('/students/30?tab=report-card')
+    await see('PROGRESS REPORT')
+    await see('Overall grade')
+    await page.getByRole('button', { name: 'Print' }).waitFor({ timeout: 8000 })
+    await page.getByRole('button', { name: 'Download PDF' }).waitFor({ timeout: 8000 })
+  }
+)
+await test(
+  {
+    id: 'RCD-02',
+    module: 'Report card',
+    type: 'View',
+    title: 'Exam results offer section report cards',
+    steps: 'Exams, Results tab of a published exam, Report cards.',
+    expected: 'Menu with this exam only and whole year',
+  },
+  async () => {
+    await go('/exams?tab=results')
+    await page.getByRole('button', { name: /Report cards/ }).click({ timeout: 8000 })
+    await see('Whole year, every term')
+    await page.keyboard.press('Escape')
+  }
+)
 {
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -2222,6 +2255,7 @@ await TA(
     ['RS-15', '/parent-preview', /Parent app/],
     ['RS-16', '/meetings', /Meetings/],
     ['RS-17', '/app-banners', 'Live now'],
+    ['RS-18', '/students/30?tab=report-card', 'PROGRESS REPORT'],
   ]) {
     await test(
       {

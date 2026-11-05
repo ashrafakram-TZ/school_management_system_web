@@ -34,7 +34,7 @@ export const http = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-const PUBLIC_PATHS = ['/auth/otp/request', '/auth/otp/verify', '/auth/refresh']
+const PUBLIC_PATHS = ['/auth/otp/request', '/auth/otp/resend', '/auth/otp/verify', '/auth/refresh']
 
 http.interceptors.request.use((request) => {
   const current = session.get()

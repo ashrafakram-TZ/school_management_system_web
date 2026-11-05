@@ -93,7 +93,7 @@ export function LoginPage() {
     setError({ code: apiError.code, message: apiError.message })
   }
 
-  const requestOtp = async (event?: FormEvent) => {
+  const requestOtp = async (event?: FormEvent, resend = false) => {
     event?.preventDefault()
     if (!/^[6-9]\d{9}$/.test(mobile)) {
       setError({ code: 'VALIDATION_FAILED', message: 'Enter a valid 10-digit mobile number' })
@@ -102,7 +102,7 @@ export function LoginPage() {
     setBusy(true)
     setError(null)
     try {
-      const result = await authApi.requestOtp(mobile)
+      const result = await (resend ? authApi.resendOtp(mobile) : authApi.requestOtp(mobile))
       setSent(result)
       setOtp('')
       setResendIn(result.resend_in)
@@ -410,7 +410,7 @@ export function LoginPage() {
                       ) : (
                         <button
                           type='button'
-                          onClick={() => void requestOtp()}
+                          onClick={() => void requestOtp(undefined, true)}
                           disabled={busy}
                           className='font-bold text-primary hover:underline disabled:opacity-50'
                         >

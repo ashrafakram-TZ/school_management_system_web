@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Bus,
   ChevronDown,
+  FileSpreadsheet,
   FileText,
   HeartPulse,
   IdCard,
@@ -42,6 +43,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { can, useMe } from '@/features/auth/api'
+import { ReportCard } from '@/features/exams/components/report-card'
 import { StudentResults } from '@/features/exams/components/student-results'
 import { StudentFeesTab } from '@/features/fees/components/student-fees-tab'
 import { alerts } from '@/lib/alerts'
@@ -263,7 +265,12 @@ export function StudentPage() {
           },
           { value: 'transport', label: 'Transport', icon: Bus },
           { value: 'achievements', label: 'Achievements', icon: Medal },
-          ...(canSeeResults ? [{ value: 'results' as const, label: 'Results', icon: Trophy }] : []),
+          ...(canSeeResults
+            ? [
+                { value: 'results' as const, label: 'Results', icon: Trophy },
+                { value: 'report-card' as const, label: 'Report card', icon: FileSpreadsheet },
+              ]
+            : []),
           ...(canSeeFees ? [{ value: 'fees' as const, label: 'Fees', icon: IndianRupee }] : []),
         ]}
       />
@@ -291,6 +298,7 @@ export function StudentPage() {
       )}
 
       {tab === 'results' && canSeeResults && <StudentResults studentId={id} />}
+      {tab === 'report-card' && canSeeResults && <ReportCard studentId={id} />}
       {tab === 'fees' && canSeeFees && <StudentFeesTab studentId={id} />}
 
       {modal === 'edit' && <EditStudentModal student={data} onClose={() => setModal(null)} />}
