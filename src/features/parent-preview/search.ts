@@ -8,6 +8,10 @@ export const PHONE_TAB_IDS = [
   'fees',
   'achievements',
   'notifications',
+  'diary',
+  'meetings',
+  'chat',
+  'news',
 ] as const
 
 export type PhoneTab = (typeof PHONE_TAB_IDS)[number]

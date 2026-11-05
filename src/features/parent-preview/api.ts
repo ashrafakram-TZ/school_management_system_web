@@ -69,7 +69,9 @@ export interface ParentNotification {
   created_at: string
 }
 
-const base = (id: number) => `/admin/students/${id}/parent-view`
+export const parentBase = (id: number) => `/admin/students/${id}/parent-view`
+
+const base = parentBase
 
 export const previewKeys = {
   all: ['parent-preview'] as const,

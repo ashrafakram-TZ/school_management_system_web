@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  BookOpenCheck,
   BusFront,
   CalendarCheck,
   ChevronLeft,
@@ -8,8 +9,13 @@ import {
   ClipboardCheck,
   IndianRupee,
   MapPin,
+  Megaphone,
+  MessagesSquare,
   UserRound,
+  Video,
 } from 'lucide-react'
+import type { ChatThread } from '@/features/chat/api'
+import type { Meeting } from '@/features/meetings/api'
 import { Avatar } from '@/components/common/avatar'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { ATTENDANCE_STATUS, today } from '@/features/attendance/labels'
@@ -23,6 +29,7 @@ import { useRouteDetail } from '@/features/transport/api'
 import { formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
+  parentBase,
   usePreviewBus,
   usePreviewHome,
   useStudentMonth,
@@ -32,6 +39,8 @@ import {
   type MonthlyAttendance,
 } from '../api'
 import type { PhoneTab } from '../tabs'
+import { usePreviewList, type DiaryFeedItem, type MyAnnouncement } from '../connect-api'
+import { ConnectTiles } from './connect-screens'
 import { AppCard, Metric, QueryView, ScreenEmpty, ScreenLoading, SectionTitle } from './phone-parts'
 
 const BUS_TONE: Record<ChildBusStatus, string> = {
@@ -104,6 +113,70 @@ function Tile({
         <span className='truncate text-[11px] font-semibold text-muted-foreground'>{label}</span>
       </span>
     </button>
+  )
+}
+
+function ParentConnect({
+  studentId,
+  onOpen,
+}: {
+  studentId: number
+  onOpen: (tab: PhoneTab) => void
+}) {
+  const base = parentBase(studentId)
+  const diary = usePreviewList<DiaryFeedItem>(base, 'diary', { page: 1, limit: 30 })
+  const meetings = usePreviewList<Meeting>(base, 'meetings', {
+    page: 1,
+    limit: 1,
+    scope: 'upcoming',
+  })
+  const chat = usePreviewList<ChatThread>(base, 'chat', { page: 1, limit: 50 })
+  const news = usePreviewList<MyAnnouncement>(base, 'announcements', {
+    page: 1,
+    limit: 1,
+    unread: true,
+  })
+  const unseen = diary.data?.items.filter((item) => !item.seen).length
+  const unreadChat = chat.data?.items.reduce((sum, thread) => sum + thread.unread, 0)
+  return (
+    <>
+      <SectionTitle>School connect</SectionTitle>
+      <ConnectTiles<PhoneTab>
+        onOpen={onOpen}
+        tiles={[
+          {
+            id: 'diary',
+            icon: BookOpenCheck,
+            label: 'Diary',
+            count: unseen,
+            hint: diary.data ? `${diary.data.total} this year` : 'Homework and remarks',
+          },
+          {
+            id: 'meetings',
+            icon: Video,
+            label: 'Meetings',
+            count: meetings.data?.total,
+            hint: meetings.data?.total ? 'Upcoming' : 'With teachers',
+          },
+          {
+            id: 'chat',
+            icon: MessagesSquare,
+            label: 'Chat',
+            count: unreadChat,
+            hint: chat.data
+              ? `${chat.data.total} ${chat.data.total === 1 ? 'conversation' : 'conversations'}`
+              : 'With teachers',
+          },
+          {
+            id: 'news',
+            icon: Megaphone,
+            label: 'News',
+            count: news.data?.total,
+            hint: 'School notices',
+          },
+        ]}
+      />
+    </>
   )
 }
 
@@ -207,6 +280,8 @@ export function HomeScreen({
                 onClick={() => onOpen('results')}
               />
             </div>
+
+            <ParentConnect studentId={studentId} onOpen={onOpen} />
           </div>
         )
       }}
