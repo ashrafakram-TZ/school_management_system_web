@@ -1,6 +1,13 @@
 import { z } from 'zod'
 
-export const SETUP_TABS = ['profile', 'years', 'classes', 'subjects', 'holidays'] as const
+export const SETUP_TABS = [
+  'profile',
+  'years',
+  'classes',
+  'subjects',
+  'holidays',
+  'communication',
+] as const
 export type SetupTab = (typeof SETUP_TABS)[number]
 
 export const setupSearchSchema = z.object({

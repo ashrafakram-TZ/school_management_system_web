@@ -1,5 +1,13 @@
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
-import { BookOpen, CalendarDays, CalendarRange, LayoutGrid, School, UserRoundX } from 'lucide-react'
+import {
+  BookOpen,
+  CalendarDays,
+  CalendarRange,
+  LayoutGrid,
+  MessagesSquare,
+  School,
+  UserRoundX,
+} from 'lucide-react'
 import { InsightCards, type Insight } from '@/components/common/insight-cards'
 import { Page, PageHeader } from '@/components/common/page'
 import { PageTabs } from '@/components/common/page-tabs'
@@ -7,6 +15,7 @@ import { can, useMe } from '@/features/auth/api'
 import { formatDate } from '@/lib/format'
 import { useSetupSummary } from '../api'
 import { ClassesTab } from '../components/classes-tab'
+import { CommunicationTab } from '../components/communication-settings'
 import { HolidaysTab } from '../components/holidays-tab'
 import { ProfileTab } from '../components/profile-tab'
 import { SubjectsTab } from '../components/subjects-tab'
@@ -69,7 +78,7 @@ export function SetupPage() {
       <PageHeader
         eyebrow='Settings'
         title='School setup'
-        description='The basics every other module uses: school profile, academic year, classes, sections, subjects and holidays.'
+        description='The basics every other module uses: school profile, academic year, classes, sections, subjects, holidays, and diary and chat rules.'
       />
       <InsightCards items={cards} loading={summary.isPending} />
       <PageTabs
@@ -87,6 +96,7 @@ export function SetupPage() {
           },
           { value: 'subjects', label: 'Subjects', icon: BookOpen, count: data?.subjects },
           { value: 'holidays', label: 'Holidays', icon: CalendarDays },
+          { value: 'communication', label: 'Diary and chat', icon: MessagesSquare },
         ]}
       />
       {tab === 'profile' && <ProfileTab canManage={canManage} />}
@@ -94,6 +104,7 @@ export function SetupPage() {
       {tab === 'classes' && <ClassesTab canManage={canManage} />}
       {tab === 'subjects' && <SubjectsTab canManage={canManage} />}
       {tab === 'holidays' && <HolidaysTab canManage={canManage} />}
+      {tab === 'communication' && <CommunicationTab canManage={canManage} />}
     </Page>
   )
 }
