@@ -46,7 +46,7 @@ function belowThousand(value: number): string {
     .join(' ')
 }
 
-export function amountInWords(value: number): string {
+function amountInWords(value: number): string {
   let rest = Math.floor(value)
   const paise = Math.round((value - rest) * 100)
   if (rest === 0 && paise === 0) return 'Rupees Zero Only'
