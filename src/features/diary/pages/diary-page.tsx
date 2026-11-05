@@ -1,5 +1,13 @@
-import { getRouteApi, useNavigate } from '@tanstack/react-router'
-import { BookOpenCheck, CalendarClock, CircleOff, Hourglass, Send, Undo2 } from 'lucide-react'
+import { getRouteApi, Link, useNavigate } from '@tanstack/react-router'
+import {
+  BookOpenCheck,
+  CalendarClock,
+  CircleOff,
+  Hourglass,
+  Send,
+  Settings2,
+  Undo2,
+} from 'lucide-react'
 import { DataTable, type Column } from '@/components/common/data-table'
 import { InsightCards, type Insight } from '@/components/common/insight-cards'
 import { FilterSelect, ListToolbar, SearchBox } from '@/components/common/list-toolbar'
@@ -161,6 +169,23 @@ export function DiaryPage() {
         eyebrow='Communication'
         title='Diary'
         description='Homework, remarks, feedback and notes teachers send to parents this academic year. Approve, send back or hide posts here.'
+        actions={
+          can(me, 'schools.view') && (
+            <Link
+              to='/setup'
+              search={{ tab: 'communication' }}
+              className='inline-flex h-10 items-center gap-2 rounded-lg border bg-card px-3.5 text-sm font-semibold hover:bg-muted'
+            >
+              <Settings2 className='size-4' />
+              Review settings
+              {insights.data && (
+                <span className='font-normal text-muted-foreground'>
+                  · {REVIEW_MODE_LABEL[insights.data.review_mode]}
+                </span>
+              )}
+            </Link>
+          )
+        }
       />
 
       <InsightCards items={cards} loading={insights.isPending} />
