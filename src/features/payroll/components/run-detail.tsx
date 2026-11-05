@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   CalendarDays,
+  Eye,
   FileDown,
   HandCoins,
   Lock,
@@ -36,6 +37,7 @@ import {
   type Payslip,
 } from '../api'
 import { RUN_STATUS, rupees, staffText, wholeRupees } from '../labels'
+import { PayslipModal } from './payslip-modal'
 import { SalaryModal } from './salary-modal'
 
 type Confirming = 'finalize' | 'delete' | null
@@ -56,6 +58,7 @@ export function RunDetail({
   const [confirming, setConfirming] = useState<Confirming>(null)
   const [settingSalary, setSettingSalary] = useState<MissingSalary | null>(null)
   const [openingSlip, setOpeningSlip] = useState<number | null>(null)
+  const [viewingSlip, setViewingSlip] = useState<Payslip | null>(null)
   const rerun = usePayrollMutation((month: string) => payrollApi.runMonth(month))
   const finalize = usePayrollMutation((id: number) => payrollApi.finalize(id))
   const remove = useDeleteRun()
@@ -174,20 +177,35 @@ export function RunDetail({
     },
   ]
 
-  const pdfButton = (slip: Payslip) => (
-    <Button
-      variant='outline'
-      size='sm'
-      aria-label={`Payslip PDF for ${slip.name}`}
-      loading={openingSlip === slip.id}
-      onClick={(event) => {
-        event.stopPropagation()
-        void openSlip(slip)
-      }}
-    >
-      <FileDown />
-      PDF
-    </Button>
+  const actionButtons = (slip: Payslip) => (
+    <div className='flex items-center justify-end gap-1.5'>
+      <Button
+        variant='outline'
+        size='sm'
+        className='border-[#0D7A53]/30 text-[#0D7A53] hover:bg-[#EAF5EE]'
+        aria-label={`View Payslip for ${slip.name}`}
+        onClick={(event) => {
+          event.stopPropagation()
+          setViewingSlip(slip)
+        }}
+      >
+        <Eye className='size-3.5' />
+        Payslip
+      </Button>
+      <Button
+        variant='outline'
+        size='sm'
+        aria-label={`Payslip PDF for ${slip.name}`}
+        loading={openingSlip === slip.id}
+        onClick={(event) => {
+          event.stopPropagation()
+          void openSlip(slip)
+        }}
+      >
+        <FileDown className='size-3.5' />
+        PDF
+      </Button>
+    </div>
   )
 
   const daysCell = (slip: Payslip) => (
@@ -207,7 +225,7 @@ export function RunDetail({
       header: 'Employee',
       cell: (slip) => (
         <div className='grid min-w-0'>
-          <span className='truncate font-bold'>{slip.name}</span>
+          <span className='truncate font-bold text-foreground hover:text-[#0D7A53]'>{slip.name}</span>
           <span className='font-mono text-xs text-muted-foreground'>{slip.employee_no}</span>
         </div>
       ),
@@ -244,9 +262,9 @@ export function RunDetail({
       key: 'net',
       header: 'Net pay',
       align: 'right',
-      cell: (slip) => <span className='tabular font-bold'>{rupees(slip.net)}</span>,
+      cell: (slip) => <span className='tabular font-bold text-[#0D7A53]'>{rupees(slip.net)}</span>,
     },
-    { key: 'pdf', header: '', align: 'right', cell: pdfButton },
+    { key: 'actions', header: '', align: 'right', cell: actionButtons },
   ]
 
   return (
@@ -344,7 +362,7 @@ export function RunDetail({
         <div className='flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3'>
           <h2 className='font-bold'>Payslips</h2>
           <span className='tabular text-xs text-muted-foreground'>
-            {staffText(data.payslips.length)}
+            {staffText(data.payslips.length)} · Click any row to preview Payslip
           </span>
         </div>
         <DataTable
@@ -352,21 +370,22 @@ export function RunDetail({
           columns={columns}
           rowKey={(slip) => slip.id}
           loading={run.isFetching}
+          onRowClick={(slip) => setViewingSlip(slip)}
           empty={{
             icon: Wallet,
             title: 'No payslips in this run',
             description: 'Set salaries for your staff, then re-run this month.',
           }}
           card={(slip) => (
-            <div className='grid gap-2'>
+            <div className='grid gap-2 cursor-pointer' onClick={() => setViewingSlip(slip)}>
               <div className='flex items-start justify-between gap-2'>
                 <span className='grid min-w-0'>
-                  <span className='truncate font-bold'>{slip.name}</span>
+                  <span className='truncate font-bold text-[#0D7A53]'>{slip.name}</span>
                   <span className='truncate text-xs text-muted-foreground'>
                     {slip.employee_no} · {slip.designation}
                   </span>
                 </span>
-                <span className='tabular shrink-0 text-right text-sm font-bold'>
+                <span className='tabular shrink-0 text-right text-sm font-bold text-[#0D7A53]'>
                   {rupees(slip.net)}
                   <span className='block text-[11px] font-medium text-muted-foreground'>net</span>
                 </span>
@@ -376,7 +395,7 @@ export function RunDetail({
                 {slip.lop_days > 0 && ` · ${slip.lop_days} LOP`} · Gross {rupees(slip.gross)} ·
                 Deductions {rupees(slip.total_deductions)}
               </span>
-              <div>{pdfButton(slip)}</div>
+              <div>{actionButtons(slip)}</div>
             </div>
           )}
         />
@@ -406,6 +425,9 @@ export function RunDetail({
           successHint={canChange ? 'Re-run this month to include them.' : undefined}
           onClose={() => setSettingSalary(null)}
         />
+      )}
+      {viewingSlip && (
+        <PayslipModal slip={viewingSlip} onClose={() => setViewingSlip(null)} />
       )}
     </div>
   )
