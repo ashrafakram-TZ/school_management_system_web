@@ -17,8 +17,8 @@ import {
   LayoutDashboard,
   School,
   ShieldCheck,
-  Smartphone,
-  TabletSmartphone,
+  // Smartphone,
+  // TabletSmartphone,
   Siren,
   Trophy,
   Truck,
@@ -90,29 +90,29 @@ export const NAV_GROUPS: NavGroup[] = [
       },
     ],
   },
-  {
-    label: 'App previews',
-    items: [
-      {
-        to: '/parent-preview',
-        label: 'Parent app',
-        description:
-          'What a parent sees for their child: attendance, bus, results, fees, diary, meetings, chat and news',
-        icon: Smartphone,
-        shortcut: 'nav.parentPreview',
-        permission: 'students.view',
-      },
-      {
-        to: '/teacher-preview',
-        label: 'Teacher app',
-        description:
-          'What a teacher sees: today’s periods, classes, diary posts, parent meetings, chat and news',
-        icon: TabletSmartphone,
-        shortcut: 'nav.teacherPreview',
-        permission: 'staff.view',
-      },
-    ],
-  },
+  // {
+  //   label: 'App previews',
+  //   items: [
+  //     {
+  //       to: '/parent-preview',
+  //       label: 'Parent app',
+  //       description:
+  //         'What a parent sees for their child: attendance, bus, results, fees, diary, meetings, chat and news',
+  //       icon: Smartphone,
+  //       shortcut: 'nav.parentPreview',
+  //       permission: 'students.view',
+  //     },
+  //     {
+  //       to: '/teacher-preview',
+  //       label: 'Teacher app',
+  //       description:
+  //         'What a teacher sees: today’s periods, classes, diary posts, parent meetings, chat and news',
+  //       icon: TabletSmartphone,
+  //       shortcut: 'nav.teacherPreview',
+  //       permission: 'staff.view',
+  //     },
+  //   ],
+  // },
   {
     label: 'People',
     items: [
