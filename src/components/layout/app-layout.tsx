@@ -123,7 +123,24 @@ export function AppLayout() {
     )
   }
   if (!me.data) return <LoadingShell />
-  if (!me.data.apps.includes('admin')) return <NoAdminAccess me={me.data} />
+
+  const isParentOnly = me.data.apps.includes('parent') && !me.data.apps.includes('admin')
+  const isStaffOnly = me.data.apps.includes('staff') && !me.data.apps.includes('admin')
+  const isAllowedPath =
+    (isParentOnly && pathname.includes('/parent-preview')) ||
+    (isStaffOnly && pathname.includes('/teacher-preview'))
+
+  if (!me.data.apps.includes('admin') && !isAllowedPath) {
+    if (isParentOnly) {
+      void navigate({ to: '/parent-preview', replace: true })
+      return <LoadingShell />
+    }
+    if (isStaffOnly) {
+      void navigate({ to: '/teacher-preview', replace: true })
+      return <LoadingShell />
+    }
+    return <NoAdminAccess me={me.data} />
+  }
 
   const items = NAV_ITEMS.filter((item) => can(me.data, item.permission))
 

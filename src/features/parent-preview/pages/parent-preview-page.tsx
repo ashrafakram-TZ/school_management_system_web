@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router'
 import { ExternalLink, Smartphone } from 'lucide-react'
 import { Combobox, type ComboboxOption } from '@/components/common/combobox'
@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { useMe } from '@/features/auth/api'
 import { useStudent, useStudents, type StudentListItem } from '@/features/students/api'
 import { useDebouncedValue } from '@/hooks/use-debounce'
-import { parentBase, usePreviewHome, usePreviewNotifications } from '../api'
+import { parentBase, useMyChildren, usePreviewHome, usePreviewNotifications } from '../api'
 import { ChatScreen, DiaryScreen, MeetingsScreen, NewsScreen } from '../components/connect-screens'
 import { AttendanceScreen, BusScreen, HomeScreen } from '../components/home-screens'
 import { PhoneFrame } from '../components/phone-frame'
@@ -103,26 +103,47 @@ export function ParentPreviewPage() {
   const search = route.useSearch()
   const navigate = useNavigate({ from: '/parent-preview' })
   const me = useMe().data
+  const isParentOnly = Boolean(me?.apps.includes('parent') && !me?.apps.includes('admin'))
+  const myChildren = useMyChildren(isParentOnly)
   const [query, setQuery] = useState('')
   const term = useDebouncedValue(query.trim(), 300)
-  const students = useStudents({ page: 1, limit: 20, status: 'active', search: term || undefined })
-  const selected = useStudent(search.student ?? null)
-  const home = usePreviewHome(search.student ?? 0)
+  const students = useStudents(
+    { page: 1, limit: 20, status: 'active', search: term || undefined },
+    !isParentOnly
+  )
+  const selected = useStudent(isParentOnly ? null : (search.student ?? null))
+
+  const activeStudentId =
+    search.student ?? (isParentOnly ? myChildren.data?.[0]?.id : undefined)
+  const home = usePreviewHome(activeStudentId ?? 0)
   const tab = search.tab ?? 'home'
 
+  useEffect(() => {
+    if (isParentOnly && !search.student && myChildren.data?.[0]) {
+      navigate({ search: (prev) => ({ ...prev, student: myChildren.data![0].id }), replace: true })
+    }
+  }, [isParentOnly, search.student, myChildren.data, navigate])
+
   const options = useMemo(() => {
+    if (isParentOnly) {
+      return (myChildren.data ?? []).map((child) => ({
+        value: String(child.id),
+        label: `${child.first_name}${child.last_name ? ' ' + child.last_name : ''} (${child.admission_no})`,
+        hint: [child.class_name, child.section_name].filter(Boolean).join(' - '),
+      }))
+    }
     const list = (students.data?.items ?? []).map(toOption)
     const current = selected.data
     if (current && !list.some((option) => option.value === String(current.id))) {
       list.unshift(toOption(current))
     }
     return list
-  }, [students.data, selected.data])
+  }, [isParentOnly, myChildren.data, students.data, selected.data])
 
   const setSearch = (patch: { student?: number; tab?: PhoneTab }) =>
     navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true })
 
-  const parent = search.student ? home.data?.parent : undefined
+  const parent = activeStudentId ? home.data?.parent : undefined
 
   return (
     <Page>
@@ -130,20 +151,24 @@ export function ParentPreviewPage() {
         <div className='grid gap-6'>
           <PageHeader
             eyebrow='Parent app'
-            title='Parent app preview'
-            description='See what a parent sees in the mobile app for their child: home, attendance, bus, results, fees, awards, diary, meetings, chat and announcements.'
+            title={isParentOnly ? 'My child' : 'Parent app preview'}
+            description={
+              isParentOnly
+                ? 'View your child’s attendance, bus location, results, diary, messages and announcements.'
+                : 'See what a parent sees in the mobile app for their child: home, attendance, bus, results, fees, awards, diary, meetings, chat and announcements.'
+            }
           />
           <Card className='grid gap-4 p-5'>
             <div className='grid gap-1.5'>
               <label htmlFor='preview-student' className='text-sm font-semibold'>
-                Student
+                {isParentOnly ? 'My child' : 'Student'}
               </label>
               <Combobox
                 id='preview-student'
-                label='Student'
-                placeholder='Pick a student'
+                label={isParentOnly ? 'My child' : 'Student'}
+                placeholder={isParentOnly ? 'Choose child' : 'Pick a student'}
                 searchPlaceholder='Search by name or admission no.'
-                value={search.student ? String(search.student) : undefined}
+                value={activeStudentId ? String(activeStudentId) : undefined}
                 options={options}
                 onSearch={setQuery}
                 emptyText={students.isPending ? 'Loading students…' : 'No students found'}
@@ -153,7 +178,7 @@ export function ParentPreviewPage() {
                 className='h-11 sm:w-full'
               />
             </div>
-            {search.student && (
+            {activeStudentId && (
               <div className='grid gap-2 text-sm'>
                 <div className='flex justify-between gap-3'>
                   <span className='text-muted-foreground'>Signed-in parent</span>
@@ -162,7 +187,7 @@ export function ParentPreviewPage() {
                       ? '…'
                       : parent
                         ? `${parent.name} (${parent.relation})`
-                        : 'No app login yet'}
+                        : me?.name ?? '—'}
                   </span>
                 </div>
                 <div className='flex justify-between gap-3'>
@@ -171,26 +196,29 @@ export function ParentPreviewPage() {
                     {me?.school?.name ?? '—'}
                   </span>
                 </div>
-                <Link
-                  to='/students/$studentId'
-                  params={{ studentId: String(search.student) }}
-                  search={{ tab: 'profile' }}
-                  className='mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline'
-                >
-                  Open student profile <ExternalLink className='size-3.5' />
-                </Link>
+                {!isParentOnly && (
+                  <Link
+                    to='/students/$studentId'
+                    params={{ studentId: String(activeStudentId) }}
+                    search={{ tab: 'profile' }}
+                    className='mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline'
+                  >
+                    Open student profile <ExternalLink className='size-3.5' />
+                  </Link>
+                )}
               </div>
             )}
             <p className='text-xs text-muted-foreground'>
-              Read-only. The preview uses the same data as the Parent app and never signs in as the
-              parent.
+              {isParentOnly
+                ? `Logged in as ${me?.name}. Viewing live child information.`
+                : 'Read-only. The preview uses the same data as the Parent app and never signs in as the parent.'}
             </p>
           </Card>
         </div>
 
-        {search.student ? (
+        {activeStudentId ? (
           <ChildPhone
-            studentId={search.student}
+            studentId={activeStudentId}
             tab={tab}
             onTab={(next) => setSearch({ tab: next })}
           />

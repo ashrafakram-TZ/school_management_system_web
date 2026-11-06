@@ -62,20 +62,26 @@ export interface Qualification {
 }
 
 export interface BankSummary {
+  id?: number
   account_holder: string | null
   bank_name: string | null
   ifsc: string | null
   account_masked: string | null
   pan_masked: string | null
   complete: boolean
+  is_primary?: boolean
 }
 
 export interface BankDetails {
+  id?: number
   account_holder: string | null
   bank_name: string | null
   ifsc: string | null
   account_no: string | null
   pan: string | null
+  account_masked?: string | null
+  pan_masked?: string | null
+  is_primary?: boolean
 }
 
 export interface TeachingAssignment {
@@ -97,6 +103,7 @@ export interface StaffDetail extends StaffListItem {
   qualifications: Qualification[]
   documents: VerifiableDoc[]
   bank: BankSummary
+  banks?: BankSummary[]
   assignments: TeachingAssignment[]
 }
 
@@ -147,11 +154,13 @@ export interface UpdateStaffInput extends Partial<StaffProfileInput> {
 }
 
 export interface BankInput {
+  id?: number
   account_holder: string
   bank_name: string
   ifsc: string
   account_no: string
   pan?: string | null
+  is_primary?: boolean
 }
 
 export interface StaffListParams {
@@ -253,9 +262,20 @@ export const staffApi = {
     }),
   removeDocument: (id: number, documentId: number) =>
     api.delete<StaffDetail>(`/admin/staff/${id}/documents/${documentId}`),
-  bank: (id: number) => api.get<BankDetails>(`/admin/staff/${id}/bank`),
-  saveBank: (id: number, input: BankInput) =>
-    api.put<StaffDetail>(`/admin/staff/${id}/bank`, input),
+  bank: (id: number) => api.get<BankDetails[]>(`/admin/staff/${id}/bank`),
+  saveBank: (id: number, input: BankInput | BankInput[] | { accounts: BankInput[] }) =>
+    api.put<StaffDetail>(
+      `/admin/staff/${id}/bank`,
+      Array.isArray(input)
+        ? { accounts: input }
+        : 'accounts' in input
+          ? input
+          : { accounts: [input] }
+    ),
+  setPrimaryBank: (id: number, bankId: number) =>
+    api.patch<StaffDetail>(`/admin/staff/${id}/bank/${bankId}/primary`),
+  removeBank: (id: number, bankId: number) =>
+    api.delete<StaffDetail>(`/admin/staff/${id}/bank/${bankId}`),
   assignments: (params: AssignmentParams) =>
     api.get<AssignmentMatrix>('/admin/teacher-assignments', { ...params }),
   saveAssignments: (input: { academic_year_id?: number; items: AssignmentItem[] }) =>

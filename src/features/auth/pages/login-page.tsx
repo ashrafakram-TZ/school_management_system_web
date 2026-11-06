@@ -120,20 +120,20 @@ export function LoginPage() {
     try {
       const result = await authApi.verifyOtp(mobile, code)
       session.set({ accessToken: result.access_token, refreshToken: result.refresh_token })
-      if (!result.user.apps.includes('admin')) {
-        await authApi.logout().catch(() => null)
-        session.clear()
-        setError({
-          code: 'NO_ADMIN_ACCESS',
-          message:
-            'This number cannot open the admin console. Use the Tamilzorous School app on your phone.',
-        })
-        setOtp('')
-        return
-      }
       queryClient.setQueryData(meKey, result.user)
       setDone(true)
-      await navigate({ to: redirect && redirect.startsWith('/') ? redirect : '/', replace: true })
+
+      const destination =
+        redirect && redirect.startsWith('/')
+          ? redirect
+          : result.user.apps.includes('admin')
+            ? '/'
+            : result.user.apps.includes('parent')
+              ? '/parent-preview'
+              : result.user.apps.includes('staff')
+                ? '/teacher-preview'
+                : '/'
+      await navigate({ to: destination, replace: true })
     } catch (caught) {
       fail(caught)
       setOtp('')

@@ -119,3 +119,28 @@ export function useStudentMonth(id: number, month: string) {
     queryFn: () => api.get<MonthlyAttendance>(`/admin/attendance/students/${id}`, { month }),
   })
 }
+
+export interface MyChildItem {
+  id: number
+  first_name: string
+  last_name: string | null
+  admission_no: string
+  gender: Gender
+  dob: string
+  photo_file_id: number | null
+  class_name: string | null
+  section_name: string | null
+  roll_no: number | null
+  class_teacher: string | null
+  relation: Relation
+  school_id: number
+  school_name: string
+}
+
+export function useMyChildren(enabled = true) {
+  return useQuery({
+    queryKey: ['my-children'],
+    queryFn: () => api.get<MyChildItem[]>('/mobile/parent/children'),
+    enabled,
+  })
+}
