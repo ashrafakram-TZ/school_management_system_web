@@ -60,6 +60,8 @@ export interface ReportCard {
     email: string | null
     board: string | null
     logo_url: string | null
+    principal_name?: string | null
+    signature_url?: string | null
   }
   student: {
     id: number

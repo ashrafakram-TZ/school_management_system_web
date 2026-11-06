@@ -451,18 +451,30 @@ function Sheet({ data, fetching }: { data: ReportCardData; fetching: boolean }) 
           <div className='grid grid-cols-3 gap-3 px-2 pb-2 pt-1 text-center text-[9px] sm:gap-6 sm:text-[10px]'>
             <div>
               <p className='h-4 truncate font-medium text-[#111827]'>
-                {student.class_teacher || 'Class Teacher'}
+                {student.class_teacher || ''}
               </p>
               <div className='mx-auto my-1 h-9 w-24 border border-black bg-white sm:h-10 sm:w-28' />
               <p className='font-bold text-[#111827]'>Class Teacher</p>
             </div>
             <div>
-              <p className='h-4 truncate font-medium text-[#111827]'>Principal</p>
-              <div className='mx-auto my-1 h-9 w-24 border border-black bg-white sm:h-10 sm:w-28' />
+              <p className='h-4 truncate font-medium text-[#111827]'>
+                {school.principal_name || 'Meenakshi Sundaram'}
+              </p>
+              <div className='mx-auto my-1 flex h-9 w-24 items-center justify-center border border-black bg-white p-0.5 sm:h-10 sm:w-28'>
+                {school.signature_url && (
+                  <img
+                    src={school.signature_url}
+                    alt='Principal Signature'
+                    className='size-full object-contain mix-blend-multiply'
+                  />
+                )}
+              </div>
               <p className='font-bold text-[#111827]'>Principal</p>
             </div>
             <div>
-              <p className='h-4 font-medium text-[#111827]'>&nbsp;</p>
+              <p className='h-4 truncate font-medium text-[#111827]'>
+                {student.parent_name || ''}
+              </p>
               <div className='mx-auto my-1 h-9 w-24 border border-black bg-white sm:h-10 sm:w-28' />
               <p className='font-bold text-[#111827]'>Parents</p>
             </div>

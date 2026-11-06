@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { FileDown, Printer } from 'lucide-react'
+import { FileDown, Printer, X } from 'lucide-react'
 import { useMe } from '@/features/auth/api'
+import { useSchoolProfile } from '@/features/setup/api'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { alerts } from '@/lib/alerts'
@@ -65,6 +66,17 @@ function amountInWords(value: number): string {
   return `${rupeesText}${paise ? ` and ${belowHundred(paise)} Paise` : ''} Only`
 }
 
+function toRelativeUrl(url: string | null | undefined): string | null {
+  if (!url) return null
+  if (url.startsWith('/')) return url
+  try {
+    const parsed = new URL(url)
+    return `${parsed.pathname}${parsed.search}`
+  } catch {
+    return url
+  }
+}
+
 export function PayslipModal({
   slip,
   onClose,
@@ -73,7 +85,14 @@ export function PayslipModal({
   onClose: () => void
 }) {
   const me = useMe().data
-  const school = me?.school
+  const { data: schoolProfile } = useSchoolProfile()
+  const schoolName = schoolProfile?.name || me?.school?.name || 'Tamilzorous Model School'
+  const schoolEmail = schoolProfile?.email || 'office@tamilzorous.edu'
+  const schoolAddress = schoolProfile?.address
+    ? `${schoolProfile.address}${schoolProfile.city ? `, ${schoolProfile.city}` : ''}`
+    : 'School Campus Office, Chennai - 600001'
+  const schoolLogoUrl = toRelativeUrl(schoolProfile?.logo_url || me?.school?.logo_url)
+  const schoolSignatureUrl = toRelativeUrl(schoolProfile?.signature_url || me?.school?.signature_url)
   const [downloading, setDownloading] = useState(false)
 
   if (!slip) return null
@@ -132,9 +151,24 @@ export function PayslipModal({
 
   const slipNumber = `#TZMS-PAY-${slip.month_label.slice(0, 3).toUpperCase()}-${slip.employee_no}`
 
+  const dueDate = (() => {
+    const parts = slip.month_label.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      const monthName = parts[0]
+      const year = parseInt(parts[1], 10) || new Date().getFullYear()
+      const monthDate = new Date(`${monthName} 1, 2000`)
+      if (!isNaN(monthDate.getTime())) {
+        const monthIndex = monthDate.getMonth()
+        const lastDay = new Date(year, monthIndex + 1, 0).getDate()
+        return `${lastDay} ${slip.month_label}`
+      }
+    }
+    return slip.month_label
+  })()
+
   return (
     <Dialog open={Boolean(slip)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className='max-h-[94vh] max-w-3xl overflow-y-auto p-0 sm:rounded-2xl border bg-white shadow-2xl'>
+      <DialogContent hideClose className='max-h-[94vh] max-w-3xl overflow-y-auto p-0 sm:rounded-2xl border bg-white shadow-2xl'>
         {/* Action Header Bar (No-Print) */}
         <div className='flex items-center justify-between border-b bg-muted/30 px-6 py-3 print:hidden'>
           <span className='font-mono text-xs font-semibold text-muted-foreground'>
@@ -153,6 +187,9 @@ export function PayslipModal({
             >
               <FileDown className='size-4' />
               Download PDF
+            </Button>
+            <Button variant='ghost' size='icon' className='size-8' onClick={onClose} aria-label='Close'>
+              <X className='size-4' />
             </Button>
           </div>
         </div>
@@ -178,10 +215,10 @@ export function PayslipModal({
 
             {/* Top Right: School Logo or Default Brand Badge (Seamless fit for ANY logo shape) */}
             <div className='flex h-14 max-w-[180px] items-center justify-end'>
-              {school?.logo_url ? (
+              {schoolLogoUrl ? (
                 <img
-                  src={school.logo_url}
-                  alt={`${school.name} logo`}
+                  src={schoolLogoUrl}
+                  alt={`${schoolName} logo`}
                   className='max-h-14 max-w-[180px] object-contain object-right'
                 />
               ) : (
@@ -205,10 +242,10 @@ export function PayslipModal({
             <div>
               <p className='text-[#6B7280]'>Billed by:</p>
               <p className='mt-1 text-sm font-bold text-[#111827]'>
-                {school?.name || 'Tamilzorous Model School'}
+                {schoolName}
               </p>
-              <p className='text-[#6B7280]'>office@tamilzorous.edu</p>
-              <p className='text-[#6B7280]'>School Campus Office, Chennai - 600001</p>
+              <p className='text-[#6B7280]'>{schoolEmail}</p>
+              <p className='text-[#6B7280]'>{schoolAddress}</p>
             </div>
 
             {/* Row 1, Right: Billed to (Employee) */}
@@ -235,7 +272,7 @@ export function PayslipModal({
             {/* Row 2, Right: Due Date */}
             <div>
               <p className='text-[#6B7280]'>Due Date:</p>
-              <p className='mt-1 font-bold text-[#111827]'>31 {slip.month_label}</p>
+              <p className='mt-1 font-bold text-[#111827]'>{dueDate}</p>
             </div>
           </div>
 
@@ -329,17 +366,17 @@ export function PayslipModal({
             </div>
 
             <div className='text-right'>
-              <div className='inline-block'>
-                {school?.signature_url ? (
-                  <div className='flex h-9 w-28 items-center justify-center'>
+              <div className='inline-block w-40 sm:w-44 text-center'>
+                {schoolSignatureUrl ? (
+                  <div className='flex h-14 sm:h-16 w-full items-end justify-center pb-1'>
                     <img
-                      src={school.signature_url}
+                      src={schoolSignatureUrl}
                       alt='Authorized Signatory'
-                      className='max-h-9 max-w-28 object-contain'
+                      className='max-h-14 sm:max-h-16 w-auto max-w-full object-contain mix-blend-multiply'
                     />
                   </div>
                 ) : (
-                  <svg viewBox='0 0 120 36' className='h-9 w-28 text-[#111827] stroke-current fill-none'>
+                  <svg viewBox='0 0 120 36' className='mx-auto h-9 w-28 text-[#111827] stroke-current fill-none'>
                     <path
                       d='M10 24 Q 25 5, 40 22 T 65 14 Q 85 8, 105 24'
                       strokeWidth='1.6'
@@ -349,7 +386,7 @@ export function PayslipModal({
                     <path d='M42 20 Q 55 12, 68 20' strokeWidth='1.4' />
                   </svg>
                 )}
-                <div className='mt-1 border-t border-[#111827] pt-1 text-center font-bold text-xs text-[#111827]'>
+                <div className='border-t border-[#111827] pt-1 text-center font-bold text-xs text-[#111827]'>
                   Authorized Signatory
                 </div>
               </div>
