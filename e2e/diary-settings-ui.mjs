@@ -57,6 +57,7 @@ const go = async (url) => {
 }
 const optionA = () => page.getByRole('radio', { name: /Review every diary post/ })
 const optionB = () => page.getByRole('radio', { name: /Review only remarks and feedback/ })
+const optionC = () => page.getByRole('radio', { name: /No review/ })
 
 const admin = await signIn('9876543210')
 page = admin.page
@@ -67,16 +68,17 @@ await test('DS-01', 'Navigation', 'Diary page has a Review settings link showing
   const link = page.getByRole('link', { name: /Review settings/ })
   await link.waitFor({ timeout: 8000 })
   const text = await link.textContent()
-  assert(/Every post is reviewed|Remarks and feedback are reviewed/.test(text ?? ''), `link text: ${text}`)
-  original = text.includes('Every post') ? 'all' : 'remarks'
+  assert(/Every post is reviewed|Remarks and feedback are reviewed|Direct posting/.test(text ?? ''), `link text: ${text}`)
+  original = text.includes('Every post') ? 'all' : text.includes('Direct posting') ? 'none' : 'remarks'
 })
 
-await test('DS-02', 'Navigation', 'Review settings opens School setup → Diary and chat', 'Click Review settings.', 'Setup page on the Diary and chat tab with options A and B', async () => {
+await test('DS-02', 'Navigation', 'Review settings opens School setup → Diary and chat', 'Click Review settings.', 'Setup page on the Diary and chat tab with options A, B and C', async () => {
   await page.getByRole('link', { name: /Review settings/ }).click()
   await page.waitForURL(/\/setup\?tab=communication/, { timeout: 8000 })
   await page.getByText('Option A', { exact: true }).waitFor({ timeout: 8000 })
   await page.getByText('Option B', { exact: true }).waitFor({ timeout: 5000 })
-  assert(await (original === 'all' ? optionA() : optionB()).isChecked(), 'saved mode should be selected')
+  await page.getByText('Option C', { exact: true }).waitFor({ timeout: 5000 })
+  assert(await (original === 'all' ? optionA() : original === 'none' ? optionC() : optionB()).isChecked(), 'saved mode should be selected')
 })
 
 await test('DS-03', 'Flow', 'Choose option A (review every post) and save', 'Click Option A, then Save settings.', 'Saved message; diary shows "Every post is reviewed"', async () => {

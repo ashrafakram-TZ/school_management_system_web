@@ -81,7 +81,7 @@ export interface SetupSummary {
   next_holiday: Holiday | null
 }
 
-export type DiaryReviewMode = 'all' | 'remarks'
+export type DiaryReviewMode = 'all' | 'remarks' | 'none'
 
 export interface SchoolProfile {
   id: number

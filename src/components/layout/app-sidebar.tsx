@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { X } from 'lucide-react'
 import { BrandLogo, BrandMark } from '@/components/common/brand-logo'
@@ -17,6 +18,12 @@ interface AppSidebarProps {
 export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSidebarProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const activeTo = currentNav(pathname).item.to
+  const activeItemRef = useRef<HTMLAnchorElement>(null)
+
+  useEffect(() => {
+    activeItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [activeTo])
+
   const groups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => can(me, item.permission)),
@@ -87,7 +94,10 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
           )
         )}
 
-        <nav className='sidebar-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3'>
+        <nav
+          data-scroll-restoration-id='sidebar-nav'
+          className='sidebar-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3'
+        >
           <div className='grid min-w-0 gap-3.5'>
             {groups.map((group) => (
               <div key={group.label} className='grid min-w-0 gap-0.5'>
@@ -103,6 +113,7 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
                   {group.items.map((item) => (
                     <li key={item.to}>
                       <Link
+                        ref={item.to === activeTo ? activeItemRef : undefined}
                         to={item.to}
                         onClick={onMobileClose}
                         activeOptions={{ exact: true }}

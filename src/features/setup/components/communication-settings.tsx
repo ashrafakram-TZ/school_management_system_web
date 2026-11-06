@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { BookOpenCheck, Check, MessageSquareWarning, Save, type LucideIcon } from 'lucide-react'
+import { BookOpenCheck, Check, MessageSquareWarning, Save, Send, type LucideIcon } from 'lucide-react'
 import { ErrorState } from '@/components/common/display'
 import { FormField } from '@/components/common/form-field'
 import { Button } from '@/components/ui/button'
@@ -37,6 +37,13 @@ const REVIEW_MODES: {
     label: 'Review only remarks and feedback',
     hint: 'Homework and notes reach parents at once. Remarks and feedback wait for the office to approve them.',
     icon: MessageSquareWarning,
+  },
+  {
+    value: 'none',
+    option: 'Option C',
+    label: 'No review (direct posting)',
+    hint: 'Homework, remarks, feedback and notes all reach parents at once with zero office review.',
+    icon: Send,
   },
 ]
 
@@ -89,7 +96,7 @@ function CommunicationSettings({
         title='Diary review'
         description='Choose which diary posts the office checks before parents see them. Teachers’ posts follow this at once; posts already waiting stay in the review list.'
       >
-        <fieldset className='grid gap-3 md:grid-cols-2' disabled={!canManage}>
+        <fieldset className='grid gap-3 lg:grid-cols-3' disabled={!canManage}>
           <legend className='sr-only'>Diary review</legend>
           {REVIEW_MODES.map((mode) => {
             const active = draft.diary_review_mode === mode.value
@@ -134,7 +141,7 @@ function CommunicationSettings({
             )
           })}
           {errors.diary_review_mode && (
-            <p className='text-sm text-destructive md:col-span-2'>{errors.diary_review_mode}</p>
+            <p className='text-sm text-destructive lg:col-span-3'>{errors.diary_review_mode}</p>
           )}
         </fieldset>
       </Section>

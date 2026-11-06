@@ -83,9 +83,20 @@ export function ExamsTab({
       key: 'dates',
       header: 'Dates',
       cell: (exam) => (
-        <span className='tabular text-sm whitespace-nowrap'>
-          {formatDate(exam.start_date)} – {formatDate(exam.end_date)}
-        </span>
+        <div className='grid min-w-0'>
+          <span className='tabular text-sm whitespace-nowrap font-medium'>
+            {formatDate(exam.start_date)} – {formatDate(exam.end_date)}
+          </span>
+          {canManage && (
+            <button
+              type='button'
+              onClick={() => setModal({ kind: 'papers', exam })}
+              className='text-left text-xs font-semibold text-primary hover:underline'
+            >
+              Subject exam dates
+            </button>
+          )}
+        </div>
       ),
     },
     {
@@ -307,7 +318,7 @@ function RowActions({
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onModal({ kind: 'papers', exam })}>
               <BookOpenCheck />
-              Subjects and max marks
+              Subject exam dates
             </DropdownMenuItem>
             {exam.status === 'draft' && (
               <>

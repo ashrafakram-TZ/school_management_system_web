@@ -63,6 +63,7 @@ export interface ExamInput {
   start_date: string
   end_date: string
   class_ids: number[]
+  subjects?: PaperInput[]
 }
 
 export interface PaperInput {
