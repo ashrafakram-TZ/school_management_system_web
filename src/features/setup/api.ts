@@ -104,6 +104,8 @@ export interface SchoolProfile {
   chat_office_end: string
   logo_file_id: number | null
   logo_url: string | null
+  signature_file_id: number | null
+  signature_url: string | null
   timezone: string
   is_active: boolean
   student_count: number

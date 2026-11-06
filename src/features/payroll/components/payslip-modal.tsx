@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileDown, Printer, X } from 'lucide-react'
+import { FileDown, Printer } from 'lucide-react'
 import { useMe } from '@/features/auth/api'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -153,9 +153,6 @@ export function PayslipModal({
             >
               <FileDown className='size-4' />
               Download PDF
-            </Button>
-            <Button variant='ghost' size='icon' onClick={onClose}>
-              <X className='size-4' />
             </Button>
           </div>
         </div>
@@ -331,19 +328,27 @@ export function PayslipModal({
               </p>
             </div>
 
-            {/* Right: Stylized Signature */}
             <div className='text-right'>
               <div className='inline-block'>
-                {/* SVG Signature representation */}
-                <svg viewBox='0 0 120 36' className='h-9 w-28 text-[#111827] stroke-current fill-none'>
-                  <path
-                    d='M10 24 Q 25 5, 40 22 T 65 14 Q 85 8, 105 24'
-                    strokeWidth='1.6'
-                    strokeLinecap='round'
-                  />
-                  <line x1='50' y1='10' x2='50' y2='28' strokeWidth='1.6' />
-                  <path d='M42 20 Q 55 12, 68 20' strokeWidth='1.4' />
-                </svg>
+                {school?.signature_url ? (
+                  <div className='flex h-9 w-28 items-center justify-center'>
+                    <img
+                      src={school.signature_url}
+                      alt='Authorized Signatory'
+                      className='max-h-9 max-w-28 object-contain'
+                    />
+                  </div>
+                ) : (
+                  <svg viewBox='0 0 120 36' className='h-9 w-28 text-[#111827] stroke-current fill-none'>
+                    <path
+                      d='M10 24 Q 25 5, 40 22 T 65 14 Q 85 8, 105 24'
+                      strokeWidth='1.6'
+                      strokeLinecap='round'
+                    />
+                    <line x1='50' y1='10' x2='50' y2='28' strokeWidth='1.6' />
+                    <path d='M42 20 Q 55 12, 68 20' strokeWidth='1.4' />
+                  </svg>
+                )}
                 <div className='mt-1 border-t border-[#111827] pt-1 text-center font-bold text-xs text-[#111827]'>
                   Authorized Signatory
                 </div>

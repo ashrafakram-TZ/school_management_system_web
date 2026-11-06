@@ -21,7 +21,13 @@ export interface Me {
   last_login_at: string | null
   created_at: string
   roles: RoleSummary[]
-  school: { id: number; name: string; code: string; logo_url: string | null } | null
+  school: {
+    id: number
+    name: string
+    code: string
+    logo_url: string | null
+    signature_url: string | null
+  } | null
   apps: AppSection[]
   permissions: string[]
   photo_file_id: number | null
