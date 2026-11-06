@@ -2,24 +2,18 @@ import { useState } from 'react'
 import { Download, FileSpreadsheet, Printer } from 'lucide-react'
 import { Combobox, type ComboboxOption } from '@/components/common/combobox'
 import { EmptyState, ErrorState } from '@/components/common/display'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { alerts } from '@/lib/alerts'
 import { toApiError } from '@/lib/api/errors'
-import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
   reportCardsApi,
   useReportCard,
   type ReportCard as ReportCardData,
-  type ReportCardCell,
   type ReportCardParams,
 } from '../report-card-api'
-import { gradeTone } from '../labels'
-
-const RESULT_TEXT = { pass: 'Passed', fail: 'Not passed', incomplete: 'Incomplete' } as const
 
 const number = (value: number) =>
   Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '')
@@ -142,333 +136,341 @@ export function ReportCard({ studentId }: { studentId: number }) {
   )
 }
 
+function getSubjectRemark(
+  grade: string | null,
+  percent: number | null,
+  passed: boolean | null
+): string {
+  if (passed === false) return 'Needs Improvement'
+  const g = (grade ?? '').toUpperCase()
+  if (g === 'O' || g === 'A1' || (percent != null && percent >= 90)) return 'Outstanding'
+  if (g === 'A+' || g === 'A2' || (percent != null && percent >= 80)) return 'Outstanding'
+  if (g === 'A' || g === 'B1' || (percent != null && percent >= 70)) return 'Very Good'
+  if (g === 'B+' || g === 'B2' || (percent != null && percent >= 60)) return 'Good'
+  if (g === 'B' || g === 'C1' || (percent != null && percent >= 50)) return 'Above Average'
+  if (g === 'C' || g === 'C2' || (percent != null && percent >= 40)) return 'Satisfactory'
+  if (g === 'D' || g === 'E' || g === 'FAIL') return 'Needs Improvement'
+  return 'Outstanding'
+}
+
+function getGradingScale(data: ReportCardData) {
+  const sampleMax = data.subjects[0]?.cells[0]?.max_marks ?? data.subjects[0]?.max_total ?? 100
+  if (sampleMax === 50) {
+    return [
+      { range: '46 - 50', grade: 'O' },
+      { range: '41 - 45', grade: 'A+' },
+      { range: '36 - 40', grade: 'A' },
+      { range: '31 - 35', grade: 'B+' },
+      { range: '26 - 30', grade: 'B' },
+      { range: '18 - 25', grade: 'C' },
+      { range: '0 - 17', grade: 'Fail' },
+    ]
+  }
+  if (data.grade_scale && data.grade_scale.length > 0) {
+    return data.grade_scale.map((step) => ({
+      range: `${step.min} - ${step.max}`,
+      grade: step.grade === 'E' ? 'Fail' : step.grade,
+    }))
+  }
+  return [
+    { range: '91 - 100', grade: 'O' },
+    { range: '81 - 90', grade: 'A+' },
+    { range: '71 - 80', grade: 'A' },
+    { range: '61 - 70', grade: 'B+' },
+    { range: '51 - 60', grade: 'B' },
+    { range: '36 - 50', grade: 'C' },
+    { range: '0 - 35', grade: 'Fail' },
+  ]
+}
+
 function Sheet({ data, fetching }: { data: ReportCardData; fetching: boolean }) {
   const { school, student, scope } = data
+  const gradingScale = getGradingScale(data)
+  const isMultiExam = data.columns.length > 1
+
   return (
-    <Card
-      className={cn('overflow-hidden transition-opacity', fetching && 'opacity-60')}
+    <div
+      className={cn(
+        'mx-auto w-full max-w-[820px] bg-white p-2 text-black shadow-sm transition-opacity sm:p-3',
+        fetching && 'opacity-60'
+      )}
       aria-label={`${scope.title} of ${student.full_name}`}
     >
-      <div className='h-1.5 bg-primary' />
-      <header className='flex flex-wrap items-start justify-between gap-4 px-4 pt-4 sm:px-6'>
-        <div className='flex min-w-0 items-start gap-3'>
-          {school.logo_url && (
-            <img
-              src={school.logo_url}
-              alt=''
-              className='size-14 shrink-0 rounded-lg object-contain'
-            />
-          )}
-          <div className='grid min-w-0 gap-0.5'>
-            <h2 className='text-xl leading-tight font-extrabold'>{school.name}</h2>
-            {school.address && <p className='text-xs text-muted-foreground'>{school.address}</p>}
-            <p className='text-xs text-muted-foreground'>
-              {[school.phone, school.email].filter(Boolean).join(' · ')}
-              {school.board && ` · Affiliated to ${school.board}`}
-            </p>
-          </div>
-        </div>
-        <div className='rounded-lg bg-primary/10 px-4 py-2 text-center'>
-          <p className='text-sm font-bold tracking-wide text-primary'>PROGRESS REPORT</p>
-          <p className='text-xs text-primary'>Academic year {scope.academic_year.name}</p>
-        </div>
-      </header>
-
-      <div className='mx-4 mt-4 rounded-md bg-primary px-4 py-2 text-center text-sm font-bold text-primary-foreground sm:mx-6'>
-        {scope.title}
-      </div>
-
-      <div className='flex gap-4 px-4 py-4 sm:px-6'>
-        <dl className='grid flex-1 grid-cols-2 gap-x-6 gap-y-2 text-sm lg:grid-cols-4'>
-          <Fact label='Student name' value={student.full_name} />
-          <Fact label='Admission no.' value={student.admission_no} />
-          <Fact
-            label='Class & section'
-            value={[student.class_name, student.section_name].filter(Boolean).join(' - ')}
-          />
-          <Fact label='Roll no.' value={student.roll_no === null ? '—' : String(student.roll_no)} />
-          <Fact label='Date of birth' value={formatDate(student.dob)} />
-          <Fact label='Parent / guardian' value={student.parent_name ?? '—'} />
-          <Fact label='Class teacher' value={student.class_teacher ?? '—'} />
-          <Fact label='Period' value={`${formatDate(scope.from)} to ${formatDate(scope.to)}`} />
-        </dl>
-        {student.photo_url && (
-          <img
-            src={student.photo_url}
-            alt={student.full_name}
-            className='hidden h-20 w-16 shrink-0 rounded-md border object-cover sm:block'
-          />
-        )}
-      </div>
-
-      <div className='px-4 sm:px-6'>
-        <MarksTable data={data} />
-      </div>
-
-      <div className='grid grid-cols-2 gap-3 px-4 pt-4 sm:px-6 lg:grid-cols-4'>
-        <Summary
-          label='Overall percentage'
-          value={data.overall.percent === null ? '—' : `${number(data.overall.percent)}%`}
-        />
-        <Summary label='Overall grade' value={data.overall.grade ?? '—'} />
-        <Summary
-          label='Result'
-          value={RESULT_TEXT[data.overall.result]}
-          danger={data.overall.result === 'fail'}
-        />
-        <Summary
-          label='Attendance'
-          value={data.attendance.percent === null ? '—' : `${number(data.attendance.percent)}%`}
-          hint={
-            data.attendance.working_days
-              ? `Present ${number(data.attendance.present_days)} of ${data.attendance.working_days} days`
-              : 'Not recorded in this period'
-          }
-        />
-      </div>
-
-      <div className='grid gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[1fr_auto]'>
-        <div className='rounded-lg border bg-muted/30 p-3'>
-          <p className='text-xs font-bold text-primary'>Class teacher's remarks</p>
-          <p className='mt-1 text-sm italic'>{data.remarks}</p>
-        </div>
-        <div>
-          <p className='text-xs font-bold text-primary'>Grading scale (%)</p>
-          <ul className='mt-1 grid grid-cols-4 gap-x-4 gap-y-1 text-xs'>
-            {data.grade_scale.map((step) => (
-              <li key={step.grade} className='tabular whitespace-nowrap'>
-                <span className='font-bold'>{step.grade}</span>{' '}
-                <span className='text-muted-foreground'>
-                  {step.min}–{step.max}
+      <div className='border-[1.5px] border-black bg-white p-2 sm:p-3'>
+        <div className='border border-black bg-white'>
+          <div className='grid grid-cols-[92px_1fr] border-b border-black'>
+            <div className='flex items-center justify-center border-r border-black bg-white p-2'>
+              {school.logo_url ? (
+                <img
+                  src={school.logo_url}
+                  alt={`${school.name} logo`}
+                  className='max-h-16 max-w-full object-contain'
+                />
+              ) : (
+                <span className='text-center text-[9px] font-medium leading-tight text-slate-400'>
+                  School
+                  <br />
+                  Logo
                 </span>
-              </li>
-            ))}
-          </ul>
+              )}
+            </div>
+
+            <div className='flex flex-col justify-between bg-white'>
+              <div className='border-b border-black px-3 py-2 text-center'>
+                <h1 className='text-[12px] font-bold uppercase tracking-wide text-[#E53E3E] sm:text-sm'>
+                  {school.name}
+                </h1>
+              </div>
+              <div className='border-b border-black px-3 py-1 text-center text-[9px] font-medium text-[#E53E3E] sm:text-[10px]'>
+                {school.address || '24, ABC street, DEF Road, Mumbai'}
+              </div>
+              <div className='px-3 py-1 text-center text-[9px] font-medium text-[#E53E3E] sm:text-[10px]'>
+                Phone: {school.phone || '9876543210'} &nbsp;&nbsp;&nbsp; Email:{' '}
+                {school.email || 'admin@saphss.com'}
+              </div>
+            </div>
+          </div>
+
+          <div className='flex justify-center px-2 py-3'>
+            <div className='min-w-[200px] px-3 py-1.5 text-center'>
+              <p className='text-[10px] font-bold uppercase text-[#111827] sm:text-[11px]'>
+                {scope.term?.name
+                  ? `${scope.term.name} Report Card`
+                  : scope.exam?.name
+                    ? `${scope.exam.name} Report Card`
+                    : scope.title || 'Term - 1 Report Card'}
+              </p>
+              <p className='text-[8px] font-semibold text-[#111827] sm:text-[9px]'>
+                Academic Year {scope.academic_year.name}
+              </p>
+            </div>
+          </div>
+
+          <div className='px-2 pb-2 text-[9px] sm:text-[10px]'>
+            <div className='grid grid-cols-3 items-baseline gap-2'>
+              <div className='flex items-baseline gap-1'>
+                <span className='shrink-0 font-bold text-[#111827]'>Roll No:</span>
+                <span className='flex-1 border-b border-black pb-0.5 text-center font-medium'>
+                  {student.roll_no ?? '—'}
+                </span>
+              </div>
+              <div className='flex items-baseline gap-1'>
+                <span className='shrink-0 font-bold text-[#111827]'>Class & Div:</span>
+                <span className='flex-1 border-b border-black pb-0.5 text-center font-medium'>
+                  {[student.class_name, student.section_name].filter(Boolean).join(' - ') || '—'}
+                </span>
+              </div>
+              <div className='flex items-baseline gap-1'>
+                <span className='shrink-0 font-bold text-[#111827]'>Attendance:</span>
+                <span className='flex-1 border-b border-black pb-0.5 text-center font-medium'>
+                  {data.attendance.working_days
+                    ? `${number(data.attendance.present_days)}/${data.attendance.working_days}`
+                    : data.attendance.percent != null
+                      ? `${number(data.attendance.percent)}%`
+                      : '—'}
+                </span>
+              </div>
+            </div>
+
+            <div className='mt-2 grid grid-cols-[1fr_auto] items-baseline gap-3 sm:grid-cols-[1.4fr_1fr]'>
+              <div className='flex items-baseline gap-1'>
+                <span className='shrink-0 font-bold text-[#111827]'>Student Name:</span>
+                <span className='flex-1 border-b border-black px-2 pb-0.5 font-medium'>
+                  {student.full_name}
+                </span>
+              </div>
+              <div className='flex min-w-[120px] items-baseline gap-1'>
+                <span className='shrink-0 font-bold text-[#111827]'>GR No:</span>
+                <span className='flex-1 border-b border-black pb-0.5 text-center font-medium'>
+                  {student.admission_no}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className='overflow-x-auto px-2 pb-2'>
+            <table className='w-full border-collapse border border-black text-[9px] sm:text-[10px]'>
+              <thead>
+                <tr className='bg-white font-bold text-[#111827]'>
+                  <th className='w-8 border border-black py-1 text-center sm:w-10'>#</th>
+                  <th className='border border-black px-2 py-1 text-left'>Subject</th>
+                  {isMultiExam ? (
+                    <>
+                      {data.columns.map((col) => (
+                        <th key={col.exam_id} className='border border-black px-1 py-1 text-center'>
+                          {col.name}
+                        </th>
+                      ))}
+                      <th className='border border-black px-1 py-1 text-center'>Total</th>
+                      <th className='border border-black px-1 py-1 text-center'>Marks</th>
+                      <th className='border border-black px-1 py-1 text-center'>Grade</th>
+                      <th className='border border-black px-1 py-1 text-center'>Remarks</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className='border border-black px-1 py-1 text-center'>Total</th>
+                      <th className='border border-black px-1 py-1 text-center'>Marks</th>
+                      <th className='border border-black px-1 py-1 text-center'>Grade</th>
+                      <th className='border border-black px-1 py-1 text-center'>Remarks</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {data.subjects.map((subj, idx) => {
+                  const totalMarks = subj.cells[0]?.max_marks ?? subj.max_total
+                  const marksObtained = subj.cells[0]?.is_absent
+                    ? 'AB'
+                    : subj.cells[0]?.marks != null
+                      ? number(subj.cells[0].marks)
+                      : number(subj.total)
+                  const grade = subj.grade ?? '—'
+                  const remark = getSubjectRemark(grade, subj.percent, subj.passed)
+
+                  return (
+                    <tr key={subj.subject_id}>
+                      <td className='border border-black py-1 text-center font-medium'>{idx + 1}</td>
+                      <td className='border border-black px-2 py-1 font-medium'>{subj.name}</td>
+                      {isMultiExam ? (
+                        <>
+                          {subj.cells.map((cell, cIdx) => (
+                            <td key={cIdx} className='border border-black px-1 py-1 text-center font-medium'>
+                              {cell?.is_absent
+                                ? 'AB'
+                                : cell?.marks != null
+                                  ? number(cell.marks)
+                                  : '—'}
+                            </td>
+                          ))}
+                          <td className='border border-black px-1 py-1 text-center font-medium'>
+                            {subj.max_total}
+                          </td>
+                          <td className='border border-black px-1 py-1 text-center font-medium'>
+                            {number(subj.total)}
+                          </td>
+                          <td className='border border-black px-1 py-1 text-center font-medium'>
+                            {grade}
+                          </td>
+                          <td className='border border-black px-1 py-1 text-center font-medium'>
+                            {remark}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className='border border-black px-1 py-1 text-center font-medium'>
+                            {totalMarks}
+                          </td>
+                          <td className='border border-black px-1 py-1 text-center font-medium'>
+                            {marksObtained}
+                          </td>
+                          <td className='border border-black px-1 py-1 text-center font-medium'>
+                            {grade}
+                          </td>
+                          <td className='border border-black px-1 py-1 text-center font-medium'>
+                            {remark}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  )
+                })}
+
+                <tr className='font-bold text-[#111827]'>
+                  <td
+                    colSpan={isMultiExam ? 2 + data.columns.length : 2}
+                    className='border border-black px-2 py-1.5 text-right'
+                  >
+                    Total
+                  </td>
+                  <td className='border border-black px-1 py-1.5 text-center'>
+                    {data.overall.max_total}
+                  </td>
+                  <td className='border border-black px-1 py-1.5 text-center'>
+                    {number(data.overall.total)}
+                  </td>
+                  <td className='border border-black px-1 py-1.5 text-center'>
+                    {data.overall.grade ?? '—'}
+                  </td>
+                  <td className='border border-black px-1 py-1.5 text-center'>
+                    {data.overall.percent != null ? `${number(data.overall.percent)}%` : '—'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className='flex flex-col items-center justify-between gap-2 px-2 pb-2 text-[9px] sm:flex-row sm:text-[10px]'>
+            <div className='flex items-baseline gap-1'>
+              <span className='font-bold text-[#111827]'>Grade:</span>
+              <span className='min-w-[40px] border-b border-black px-2 pb-0.5 text-center font-medium'>
+                {data.overall.grade ?? '—'}
+              </span>
+            </div>
+            <div className='flex items-baseline gap-1'>
+              <span className='font-bold text-[#111827]'>Overall Percentage:</span>
+              <span className='min-w-[60px] border-b border-black px-2 pb-0.5 text-center font-medium'>
+                {data.overall.percent != null ? `${number(data.overall.percent)} %` : '—'}
+              </span>
+            </div>
+            <div className='flex items-baseline gap-1'>
+              <span className='font-bold text-[#111827]'>Rank:</span>
+              <span className='min-w-[38px] border-b border-black px-2 pb-0.5 text-center font-medium'>
+                {data.columns[0]?.class_rank ?? data.columns[0]?.section_rank ?? 1}
+              </span>
+            </div>
+          </div>
+
+          <div className='px-2 pb-2'>
+            <table className='mx-auto w-full max-w-[480px] border-collapse border border-black text-center text-[8px] sm:text-[9px]'>
+              <thead>
+                <tr className='font-bold text-[#111827]'>
+                  <th colSpan={gradingScale.length} className='border border-black px-1 py-1'>
+                    Grading System
+                  </th>
+                </tr>
+                <tr>
+                  {gradingScale.map((item, idx) => (
+                    <td key={idx} className='border border-black px-1 py-1 font-medium'>
+                      {item.range}
+                    </td>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {gradingScale.map((item, idx) => (
+                    <td key={idx} className='border border-black px-1 py-1 font-bold'>
+                      {item.grade}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className='grid grid-cols-3 gap-3 px-2 pb-2 pt-1 text-center text-[9px] sm:gap-6 sm:text-[10px]'>
+            <div>
+              <p className='h-4 truncate font-medium text-[#111827]'>
+                {student.class_teacher || 'Class Teacher'}
+              </p>
+              <div className='mx-auto my-1 h-9 w-24 border border-black bg-white sm:h-10 sm:w-28' />
+              <p className='font-bold text-[#111827]'>Class Teacher</p>
+            </div>
+            <div>
+              <p className='h-4 truncate font-medium text-[#111827]'>Principal</p>
+              <div className='mx-auto my-1 h-9 w-24 border border-black bg-white sm:h-10 sm:w-28' />
+              <p className='font-bold text-[#111827]'>Principal</p>
+            </div>
+            <div>
+              <p className='h-4 font-medium text-[#111827]'>&nbsp;</p>
+              <div className='mx-auto my-1 h-9 w-24 border border-black bg-white sm:h-10 sm:w-28' />
+              <p className='font-bold text-[#111827]'>Parents</p>
+            </div>
+          </div>
+
+          <div className='pb-1 text-center text-[11px] font-bold text-[#111827]'>1</div>
         </div>
       </div>
-
-      <div className='grid grid-cols-3 gap-4 px-4 pt-8 pb-5 text-center text-xs text-muted-foreground sm:px-6'>
-        {['Class teacher', 'Principal', 'Parent / guardian'].map((label) => (
-          <div key={label} className='border-t pt-1.5'>
-            {label}
-          </div>
-        ))}
-      </div>
-    </Card>
-  )
-}
-
-function MarksTable({ data }: { data: ReportCardData }) {
-  const showTerms = data.terms.length > 1 || data.terms[0]?.term_id !== null
-  const footer: { label: string; cell: (index: number) => string; overall: string[] }[] = [
-    {
-      label: 'Total',
-      cell: (index) => `${number(data.columns[index]!.total)}/${data.columns[index]!.max_total}`,
-      overall: [`${number(data.overall.total)}/${data.overall.max_total}`, '', ''],
-    },
-    {
-      label: 'Percentage',
-      cell: (index) => {
-        const percent = data.columns[index]!.percent
-        return percent === null ? '—' : `${number(percent)}%`
-      },
-      overall: ['', data.overall.percent === null ? '—' : `${number(data.overall.percent)}%`, ''],
-    },
-    {
-      label: 'Grade',
-      cell: (index) => data.columns[index]!.grade ?? '—',
-      overall: ['', '', data.overall.grade ?? '—'],
-    },
-    {
-      label: 'Rank in class',
-      cell: (index) => {
-        const column = data.columns[index]!
-        return column.class_rank === null ? '—' : `${column.class_rank} / ${column.class_size}`
-      },
-      overall: ['', '', ''],
-    },
-  ]
-  return (
-    <div className='overflow-x-auto rounded-lg border'>
-      <table className='w-full min-w-[640px] border-collapse text-sm'>
-        <thead>
-          {showTerms && (
-            <tr className='bg-primary/90 text-primary-foreground'>
-              <th rowSpan={2} className='bg-primary px-3 py-2 text-left font-semibold'>
-                Subject
-              </th>
-              {data.terms.map((term) => (
-                <th
-                  key={`${term.term_id}-${term.exam_ids[0]}`}
-                  colSpan={term.exam_ids.length}
-                  className='border-l border-primary-foreground/20 px-2 py-1 text-xs font-semibold'
-                >
-                  {term.name}
-                </th>
-              ))}
-              <th
-                colSpan={3}
-                className='border-l border-primary-foreground/20 px-2 py-1 text-xs font-semibold'
-              >
-                Overall
-              </th>
-            </tr>
-          )}
-          <tr className='bg-primary text-primary-foreground'>
-            {!showTerms && <th className='px-3 py-2 text-left font-semibold'>Subject</th>}
-            {data.columns.map((column) => (
-              <th
-                key={column.exam_id}
-                className='border-l border-primary-foreground/20 px-2 py-2 text-center text-xs font-semibold'
-              >
-                {column.name}
-                {column.common_max && (
-                  <span className='block font-normal opacity-80'>out of {column.common_max}</span>
-                )}
-              </th>
-            ))}
-            {['Marks', '%', 'Grade'].map((label) => (
-              <th
-                key={label}
-                className='border-l border-primary-foreground/20 px-2 py-2 text-center text-xs font-semibold'
-              >
-                {label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.subjects.map((subject) => (
-            <tr key={subject.subject_id} className='border-t even:bg-muted/40'>
-              <th scope='row' className='px-3 py-2 text-left font-medium'>
-                {subject.name}
-              </th>
-              {subject.cells.map((cell, index) => (
-                <td
-                  key={data.columns[index]!.exam_id}
-                  className={cn(
-                    'tabular border-l px-2 py-2 text-center',
-                    cell?.passed === false && 'font-semibold text-destructive'
-                  )}
-                >
-                  {cellText(cell, data.columns[index]!.common_max)}
-                </td>
-              ))}
-              <td
-                className={cn(
-                  'tabular border-l px-2 py-2 text-center',
-                  subject.passed === false && 'text-destructive'
-                )}
-              >
-                {subject.max_total ? `${number(subject.total)}/${subject.max_total}` : '—'}
-              </td>
-              <td
-                className={cn(
-                  'tabular border-l px-2 py-2 text-center',
-                  subject.passed === false && 'text-destructive'
-                )}
-              >
-                {subject.percent === null ? '—' : number(subject.percent)}
-              </td>
-              <td className='border-l px-2 py-2 text-center'>
-                {subject.grade ? (
-                  <Badge tone={gradeTone(subject.grade)}>{subject.grade}</Badge>
-                ) : (
-                  '—'
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot className='font-semibold text-primary'>
-          {footer.map((row) => (
-            <tr key={row.label} className='border-t bg-primary/5'>
-              <th scope='row' className='px-3 py-1.5 text-left'>
-                {row.label}
-              </th>
-              {data.columns.map((column, index) => (
-                <td
-                  key={column.exam_id}
-                  className='tabular border-l px-2 py-1.5 text-center text-xs'
-                >
-                  {row.cell(index)}
-                </td>
-              ))}
-              {row.overall.map((value, index) => (
-                <td key={index} className='tabular border-l px-2 py-1.5 text-center text-xs'>
-                  {value}
-                </td>
-              ))}
-            </tr>
-          ))}
-          <tr className='border-t bg-primary/5'>
-            <th scope='row' className='px-3 py-1.5 text-left'>
-              Result
-            </th>
-            {data.columns.map((column) => (
-              <td
-                key={column.exam_id}
-                className={cn(
-                  'border-l px-2 py-1.5 text-center text-xs',
-                  column.result === 'fail' && 'text-destructive'
-                )}
-              >
-                {RESULT_TEXT[column.result]}
-              </td>
-            ))}
-            <td
-              colSpan={3}
-              className={cn(
-                'border-l px-2 py-1.5 text-center text-xs',
-                data.overall.result === 'fail' && 'text-destructive'
-              )}
-            >
-              {RESULT_TEXT[data.overall.result]}
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  )
-}
-
-function cellText(cell: ReportCardCell | null, commonMax: number | null) {
-  if (!cell) return '—'
-  if (cell.passed === null) return '·'
-  if (cell.is_absent) return 'AB'
-  const marks = number(cell.marks ?? 0)
-  return commonMax ? marks : `${marks}/${cell.max_marks}`
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className='grid min-w-0 gap-0.5'>
-      <dt className='text-xs text-muted-foreground'>{label}</dt>
-      <dd className='truncate font-semibold'>{value}</dd>
-    </div>
-  )
-}
-
-function Summary({
-  label,
-  value,
-  hint,
-  danger,
-}: {
-  label: string
-  value: string
-  hint?: string
-  danger?: boolean
-}) {
-  return (
-    <div className='grid gap-0.5 rounded-lg border p-3'>
-      <span className='text-xs text-muted-foreground'>{label}</span>
-      <span
-        className={cn('tabular text-lg font-extrabold text-primary', danger && 'text-destructive')}
-      >
-        {value}
-      </span>
-      {hint && <span className='text-[11px] text-muted-foreground'>{hint}</span>}
     </div>
   )
 }
