@@ -297,11 +297,12 @@ export const studentsApi = {
   removeAdmission: (id: number) => api.delete<{ id: number }>(`/admin/admissions/${id}`),
 }
 
-export function useStudents(params: StudentListParams) {
+export function useStudents(params: StudentListParams, enabled = true) {
   return useQuery({
     queryKey: studentKeys.list(params),
     queryFn: () => studentsApi.list(params),
     placeholderData: keepPreviousData,
+    enabled,
   })
 }
 

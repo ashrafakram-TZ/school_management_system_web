@@ -26,7 +26,11 @@ export function AppSidebar({ me, collapsed, mobileOpen, onMobileClose }: AppSide
 
   const groups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => can(me, item.permission)),
+    items: group.items.filter((item) => {
+      if (item.to === '/parent-preview' && me.apps.includes('parent')) return true
+      if (item.to === '/teacher-preview' && me.apps.includes('staff')) return true
+      return can(me, item.permission)
+    }),
   })).filter((group) => group.items.length > 0)
 
   return (

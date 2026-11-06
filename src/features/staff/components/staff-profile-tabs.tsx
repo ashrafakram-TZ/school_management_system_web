@@ -2,13 +2,17 @@ import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   BookOpen,
+  Check,
   Eye,
   EyeOff,
   GraduationCap,
   Grid3x3,
   Landmark,
   Pencil,
+  Plus,
   School,
+  Star,
+  Trash2,
 } from 'lucide-react'
 import { DetailList, EmptyState, ErrorState } from '@/components/common/display'
 import { DocumentList } from '@/components/common/document-list'
@@ -226,31 +230,34 @@ export function BankTab({ staff, canBank }: { staff: StaffDetail; canBank: boole
   const [revealed, setRevealed] = useState(false)
   const [editing, setEditing] = useState(false)
   const full = useStaffBank(staff.id, revealed && canBank)
-  const bank = staff.bank
-  const hasAny = Boolean(bank.account_holder || bank.bank_name || bank.account_masked)
+  const setPrimary = useStaffMutation((bankId: number) => staffApi.setPrimaryBank(staff.id, bankId))
+  const removeBank = useStaffMutation((bankId: number) => staffApi.removeBank(staff.id, bankId))
+
+  const bankList = staff.banks && staff.banks.length > 0 ? staff.banks : staff.bank.complete ? [staff.bank] : []
+  const hasAny = bankList.length > 0
 
   return (
     <Section
       title='Bank details'
-      description='For salary payments. Numbers stay hidden unless you choose to show them.'
+      description='For salary payments. Primary account is used for payroll disbursements.'
       action={
         canBank && (
-          <>
-            {bank.complete && (
+          <div className='flex items-center gap-2'>
+            {hasAny && (
               <Button size='sm' variant='outline' onClick={() => setRevealed((value) => !value)}>
-                {revealed ? <EyeOff /> : <Eye />}
+                {revealed ? <EyeOff className='size-4' /> : <Eye className='size-4' />}
                 {revealed ? 'Hide numbers' : 'Show full details'}
               </Button>
             )}
             <Button
               size='sm'
-              variant={bank.complete ? 'outline' : 'default'}
+              variant={hasAny ? 'outline' : 'default'}
               onClick={() => setEditing(true)}
             >
-              <Pencil />
-              {bank.complete ? 'Edit bank details' : 'Add bank details'}
+              {hasAny ? <Pencil className='size-4' /> : <Plus className='size-4' />}
+              {hasAny ? 'Manage bank accounts' : 'Add bank account'}
             </Button>
-          </>
+          </div>
         )
       }
     >
@@ -260,7 +267,7 @@ export function BankTab({ staff, canBank }: { staff: StaffDetail; canBank: boole
           title='No bank details yet'
           description={
             canBank
-              ? 'Add the salary account so payroll can pay this person.'
+              ? 'Add a salary account so payroll can pay this person.'
               : 'Someone with bank access needs to add them.'
           }
           className='py-6'
@@ -269,44 +276,92 @@ export function BankTab({ staff, canBank }: { staff: StaffDetail; canBank: boole
         <ErrorState message={full.error.message} onRetry={() => full.refetch()} className='py-6' />
       ) : (
         <div className='grid gap-4'>
-          {!bank.complete && (
-            <Badge tone='warning' className='justify-self-start'>
-              Incomplete
-            </Badge>
-          )}
-          <DetailList
-            items={[
-              { label: 'Account holder', value: orDash(bank.account_holder) },
-              { label: 'Bank', value: orDash(bank.bank_name) },
-              { label: 'IFSC', value: orDash(bank.ifsc), mono: true },
-              {
-                label: 'Account number',
-                mono: true,
-                value: revealed ? (
-                  full.isPending ? (
-                    <Skeleton className='h-5 w-36' />
-                  ) : (
-                    orDash(full.data?.account_no)
-                  )
-                ) : (
-                  orDash(bank.account_masked)
-                ),
-              },
-              {
-                label: 'PAN',
-                mono: true,
-                value: revealed ? (
-                  full.isPending ? (
-                    <Skeleton className='h-5 w-28' />
-                  ) : (
-                    orDash(full.data?.pan)
-                  )
-                ) : (
-                  orDash(bank.pan_masked)
-                ),
-              },
-            ]}
-          />
+          {bankList.map((item, index) => {
+            const fullRecord = Array.isArray(full.data)
+              ? full.data.find((d) => (item.id && d.id === item.id) || d.ifsc === item.ifsc)
+              : full.data
+            return (
+              <div
+                key={item.id ?? index}
+                className='relative rounded-lg border bg-card p-4 shadow-sm'
+              >
+                <div className='mb-3 flex flex-wrap items-center justify-between gap-2 border-b pb-3'>
+                  <div className='flex items-center gap-2'>
+                    <span className='font-semibold text-foreground'>{orDash(item.bank_name)}</span>
+                    {item.is_primary ? (
+                      <Badge tone='success' className='flex items-center gap-1 text-xs'>
+                        <Check className='size-3' />
+                        Primary salary account
+                      </Badge>
+                    ) : (
+                      canBank &&
+                      item.id && (
+                        <Button
+                          size='sm'
+                          variant='ghost'
+                          disabled={setPrimary.isPending}
+                          onClick={() => setPrimary.mutate(item.id!)}
+                          className='h-6 px-2 text-xs text-muted-foreground hover:text-foreground'
+                        >
+                          <Star className='mr-1 size-3' />
+                          Set as primary
+                        </Button>
+                      )
+                    )}
+                    {!item.complete && (
+                      <Badge tone='warning' className='text-xs'>
+                        Incomplete
+                      </Badge>
+                    )}
+                  </div>
+                  {canBank && item.id && bankList.length > 1 && (
+                    <Button
+                      size='icon-sm'
+                      variant='ghost'
+                      disabled={removeBank.isPending}
+                      onClick={() => removeBank.mutate(item.id!)}
+                      className='text-muted-foreground hover:text-destructive'
+                    >
+                      <Trash2 className='size-3.5' />
+                    </Button>
+                  )}
+                </div>
+                <DetailList
+                  items={[
+                    { label: 'Account holder', value: orDash(item.account_holder) },
+                    { label: 'Bank', value: orDash(item.bank_name) },
+                    { label: 'IFSC', value: orDash(item.ifsc), mono: true },
+                    {
+                      label: 'Account number',
+                      mono: true,
+                      value: revealed ? (
+                        full.isPending ? (
+                          <Skeleton className='h-5 w-36' />
+                        ) : (
+                          orDash(fullRecord?.account_no ?? item.account_masked)
+                        )
+                      ) : (
+                        orDash(item.account_masked)
+                      ),
+                    },
+                    {
+                      label: 'PAN',
+                      mono: true,
+                      value: revealed ? (
+                        full.isPending ? (
+                          <Skeleton className='h-5 w-28' />
+                        ) : (
+                          orDash(fullRecord?.pan ?? item.pan_masked)
+                        )
+                      ) : (
+                        orDash(item.pan_masked)
+                      ),
+                    },
+                  ]}
+                />
+              </div>
+            )
+          })}
         </div>
       )}
       <BankModal staff={staff} open={editing} onOpenChange={setEditing} />
