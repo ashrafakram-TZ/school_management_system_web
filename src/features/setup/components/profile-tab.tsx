@@ -101,6 +101,7 @@ function ProfileForm({ school, canManage }: { school: SchoolProfile; canManage: 
       <form noValidate onSubmit={submit} className='grid gap-4 sm:grid-cols-2'>
         <RootError message={errors.root} />
         <SchoolLogo school={school} canManage={canManage} />
+        <SchoolSignature school={school} canManage={canManage} />
         {field('name', 'School name')}
         <FormField id='school-board' label='Board'>
           <Combobox
@@ -228,6 +229,100 @@ function SchoolLogo({ school, canManage }: { school: SchoolProfile; canManage: b
                   try {
                     await save.mutateAsync(null)
                     alerts.success('School logo removed')
+                  } catch (caught) {
+                    setError(toApiError(caught).message)
+                  }
+                }}
+              >
+                <Trash2 />
+                Remove
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </FormField>
+  )
+}
+
+function SchoolSignature({ school, canManage }: { school: SchoolProfile; canManage: boolean }) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const save = useSetupMutation((signature_file_id: number | null) =>
+    setupApi.updateSchool({ signature_file_id })
+  )
+
+  const upload = async (file: File | undefined) => {
+    if (!file) return
+    setError('')
+    if (!LOGO_TYPES.includes(file.type)) return setError('Choose a PNG, JPG or WEBP image')
+    if (file.size > 2 * 1024 * 1024) return setError('The signature must be 2 MB or smaller')
+    setUploading(true)
+    try {
+      const uploaded = await filesApi.upload(file, 'school_signature')
+      await save.mutateAsync(uploaded.id)
+      alerts.success('Authorized signature saved')
+    } catch (caught) {
+      setError(toApiError(caught).message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <FormField
+      id='school-signature'
+      label='Authorized digital signature / seal'
+      error={error}
+      hint='PNG with transparent background or JPG, up to 2 MB. Displayed on official payslips.'
+      className='sm:col-span-2'
+    >
+      <div className='flex flex-wrap items-center gap-4'>
+        <div className='grid h-16 w-36 shrink-0 place-items-center overflow-hidden rounded-xl border bg-white p-2'>
+          {school.signature_url ? (
+            <img
+              src={school.signature_url}
+              alt='Authorized signature'
+              className='size-full object-contain'
+            />
+          ) : (
+            <ImageUp className='size-6 text-muted-foreground' aria-hidden />
+          )}
+        </div>
+        {canManage && (
+          <div className='flex flex-wrap gap-2'>
+            <Button asChild variant='outline' size='sm' disabled={uploading}>
+              <label htmlFor='school-signature' className='cursor-pointer'>
+                <ImageUp />
+                {uploading
+                  ? 'Uploading…'
+                  : school.signature_url
+                    ? 'Change signature'
+                    : 'Upload signature'}
+                <input
+                  id='school-signature'
+                  type='file'
+                  accept={LOGO_TYPES.join(',')}
+                  className='sr-only'
+                  disabled={uploading}
+                  onChange={(event) => {
+                    void upload(event.target.files?.[0])
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+            </Button>
+            {school.signature_url && (
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                className='text-destructive hover:bg-destructive/10'
+                loading={save.isPending && !uploading}
+                onClick={async () => {
+                  try {
+                    await save.mutateAsync(null)
+                    alerts.success('Authorized signature removed')
                   } catch (caught) {
                     setError(toApiError(caught).message)
                   }
