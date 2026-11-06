@@ -51,7 +51,7 @@ export interface DiaryInsights {
   rejected: number
   hidden: number
   homework_due_this_week: number
-  review_mode: 'all' | 'remarks'
+  review_mode: 'all' | 'remarks' | 'none'
 }
 
 export interface DiaryListParams {

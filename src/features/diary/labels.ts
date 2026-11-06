@@ -18,4 +18,5 @@ export const DIARY_TYPE: Record<DiaryType, { label: string; tone: BadgeTone }> =
 export const REVIEW_MODE_LABEL = {
   all: 'Every post is reviewed',
   remarks: 'Remarks and feedback are reviewed',
+  none: 'Direct posting (no review)',
 } as const
